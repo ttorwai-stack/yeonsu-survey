@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>연수 사후설문</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f3f4f6;
+    --card: #ffffff;
+    --ink: #111827;
+    --ink-2: #4b5563;
+    --ink-3: #9ca3af;
+    --line: #e5e7eb;
+    --accent: #2a78d6;
+    --accent-soft: #e8f1fc;
+    --accent-ink: #1c5cab;
+    --danger: #d03b3b;
+    --danger-soft: #fdecec;
+    --ok: #0a7d0a;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body {
+    font-family: "Pretendard Variable", Pretendard, system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+    font-size: 16px; line-height: 1.5; -webkit-font-smoothing: antialiased;
+  }
+  button, input, textarea { font: inherit; color: inherit; }
+
+  /* 상단 고정 영역 */
+  .top { position: sticky; top: 0; z-index: 10; background: rgba(243,244,246,.94); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  .top-in { max-width: 760px; margin: 0 auto; padding: 12px 16px 10px; }
+  .top h1 { font-size: 16px; margin: 0 0 8px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .steps { display: flex; gap: 6px; margin-bottom: 8px; }
+  .step { flex: 1; font-size: 12.5px; color: var(--ink-3); text-align: center; padding: 6px 2px; border-radius: 8px; background: transparent; border: 0; cursor: pointer; white-space: nowrap; }
+  .step b { display: inline-block; width: 18px; height: 18px; line-height: 18px; border-radius: 50%; background: var(--line); color: var(--ink-2); font-size: 11px; margin-right: 4px; }
+  .step.on { color: var(--accent-ink); font-weight: 700; background: var(--accent-soft); }
+  .step.on b { background: var(--accent); color: #fff; }
+  .step.done b { background: var(--ok); color: #fff; }
+  .bar { height: 6px; background: var(--line); border-radius: 99px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 99px; transition: width .25s; }
+  .bar-txt { font-size: 12px; color: var(--ink-2); margin-top: 4px; text-align: right; }
+
+  main { max-width: 760px; margin: 0 auto; padding: 16px 16px 120px; }
+  .intro { background: var(--card); border-radius: var(--radius); padding: 18px; margin-bottom: 14px; border: 1px solid var(--line); }
+  .intro h2 { margin: 0 0 4px; font-size: 20px; }
+  .intro .meta { color: var(--ink-2); font-size: 14px; }
+  .intro p { margin: 10px 0 0; color: var(--ink-2); font-size: 14.5px; white-space: pre-line; } /* 설정에서 넣은 줄바꿈 그대로 */
+  .sec-title { font-size: 18px; font-weight: 700; margin: 6px 2px 4px; }
+  .sec-desc { font-size: 14px; color: var(--ink-2); margin: 0 2px 14px; }
+  .day { font-size: 14px; font-weight: 700; color: var(--ink-2); margin: 22px 2px 8px; }
+
+  .card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--line); padding: 16px; margin-bottom: 12px; transition: border-color .2s, box-shadow .2s; }
+  .card.missing { border-color: var(--danger); box-shadow: 0 0 0 3px var(--danger-soft); }
+  .q + .q { margin-top: 18px; padding-top: 16px; border-top: 1px dashed var(--line); }
+  .q.missing .qt { color: var(--danger); }
+  .qt { font-size: 15.5px; font-weight: 600; margin-bottom: 10px; }
+  .qt .n { color: var(--accent); margin-right: 4px; }
+  .req { color: var(--danger); font-weight: 700; margin-left: 2px; }
+  .warn { display: none; color: var(--danger); font-size: 13px; margin-top: 6px; }
+  .missing > .warn, .q.missing .warn { display: block; }
+
+  /* 5점 척도 */
+  /* 선형 척도: 위에 라벨, 아래 가로선 위의 동그라미 (왼쪽 = 가장 긍정) */
+  .scale { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); }
+  .scale::before { content: ''; position: absolute; left: 10%; right: 10%; bottom: 15px; height: 2px; background: #c9ced6; }
+  .opt { position: relative; }
+  .opt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; z-index: 2; }
+  .opt > span { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 8px; height: 100%; padding: 2px 1px 3px; cursor: pointer; text-align: center; }
+  .opt .lbl { font-size: 12.5px; color: var(--ink-2); line-height: 1.25; word-break: keep-all; min-height: 2.5em; display: flex; align-items: flex-end; justify-content: center; }
+  .opt .dot { position: relative; z-index: 1; width: 26px; height: 26px; border-radius: 50%; border: 2px solid #aab1bc; background: #fff; transition: border-color .12s, background .12s, transform .12s; }
+  /* 터치 중(스크롤하다 닿은 상태)에는 아무 표시도 하지 않음: 빈 칸 / 체크 두 상태만 보이게 */
+  .opt, .chip { -webkit-tap-highlight-color: transparent; }
+  .opt input:focus-visible + span .dot { outline: 2px dashed #6b7280; outline-offset: 3px; } /* 키보드 사용자 전용 */
+  .opt input:checked + span .dot { border-color: var(--accent); transform: scale(1.08); background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5L20 7'/%3E%3C/svg%3E") center/15px no-repeat; }
+  .opt input:checked + span .lbl { color: var(--accent-ink); font-weight: 700; }
+  .scale.disabled { opacity: .35; pointer-events: none; }
+
+  /* 선택지 칩 */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { position: relative; }
+  .chip input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .chip span { display: inline-block; padding: 9px 14px; border: 1.5px solid var(--line); border-radius: 99px; background: #fff; cursor: pointer; font-size: 15px; }
+  .chip input:focus-visible + span { outline: 2px dashed #6b7280; outline-offset: 2px; }
+  .chip input:checked + span { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .other-in { margin-top: 8px; width: 100%; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 10px; }
+  .other-in:focus, textarea:focus { outline: none; border-color: var(--accent); }
+
+  /* 과목 카드 */
+  .sess-h { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 12px; }
+  .when { flex: none; font-size: 12px; font-weight: 700; color: var(--accent-ink); background: var(--accent-soft); border-radius: 8px; padding: 4px 8px; margin-top: 2px; }
+  .sess-t { font-size: 16.5px; font-weight: 700; line-height: 1.35; }
+  .sess-i { font-size: 13.5px; color: var(--ink-2); }
+  .split-badge { display: inline-block; font-size: 11.5px; font-weight: 700; color: #9a5b00; background: #fff4d6; border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: 2px; }
+  .pick { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 4px; }
+  .pick .chip span { display: block; border-radius: 12px; padding: 10px 12px; height: 100%; }
+  .pick .chip span small { display: block; font-size: 12.5px; color: var(--ink-2); font-weight: 400; }
+  .pick-hint { font-size: 13px; color: var(--ink-2); margin: 0 0 8px; }
+  .done-mark { margin-left: auto; flex: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); }
+  .card.complete .done-mark { border-color: var(--ok); background: var(--ok) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5L20 7'/%3E%3C/svg%3E") center/14px no-repeat; }
+  .sq { font-size: 14px; font-weight: 600; margin: 12px 0 8px; color: var(--ink); }
+  .sq em { font-style: normal; font-size: 12px; font-weight: 700; color: var(--ink-2); background: var(--bg); border-radius: 6px; padding: 1px 6px; margin-right: 6px; }
+
+  textarea { width: 100%; min-height: 96px; padding: 12px; border: 1.5px solid var(--line); border-radius: 10px; resize: vertical; }
+  .opt-note { font-size: 12.5px; color: var(--ink-3); font-weight: 400; margin-left: 4px; }
+
+  /* 하단 버튼 */
+  .nav { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,.96); border-top: 1px solid var(--line); z-index: 10; }
+  .nav-in { max-width: 760px; margin: 0 auto; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); display: flex; gap: 10px; }
+  .btn { flex: 1; padding: 14px; border-radius: 12px; border: 1.5px solid var(--line); background: #fff; font-weight: 700; font-size: 16px; cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; flex: 2; }
+  .btn.primary:hover { background: var(--accent-ink); }
+  .btn:disabled { opacity: .5; cursor: default; }
+
+  .center { text-align: center; padding: 60px 20px; }
+  .edit-note { font-size: 13px; color: var(--ink-3); margin-top: 8px !important; }
+  .edit-banner { background: #fff4d6; color: #7a4a00; border-radius: 10px; padding: 10px 14px; font-size: 14px; margin-bottom: 12px; }
+  a.pick-survey { display: block; color: inherit; text-decoration: none; }
+  a.pick-survey:hover { border-color: var(--accent); }
+  .center h2 { font-size: 22px; margin: 16px 0 8px; }
+  .center p { color: var(--ink-2); margin: 0 0 20px; }
+  .big-check { width: 72px; height: 72px; border-radius: 50%; margin: 0 auto; background: var(--ok) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5L20 7'/%3E%3C/svg%3E") center/38px no-repeat; }
+  .toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); background: #111827; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 14px; z-index: 20; display: none; max-width: calc(100% - 32px); }
+
+  @media (max-width: 480px) {
+    .opt .lbl { font-size: 11.5px; }
+    .step { font-size: 0; }
+    .step b { font-size: 11px; margin: 0; }
+    .step.on { font-size: 12.5px; }
+    .step.on b { margin-right: 4px; }
+  }
+</style>
+</head>
+<body>
+<div id="app"><div class="center"><p>설문을 불러오는 중…</p></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ───── 서버 호출 (Apps Script / 로컬 미리보기 공통) ───── */
+  // 실행 환경: Apps Script 안(gas) / 내 PC 미리보기(mock) / GitHub Pages 등 외부(http)
+  var API_URL = 'https://script.google.com/macros/s/AKfycbyUUAH8jsoHkZlngyhJ6pab1aRJy3X7qi1H0665IOJNG7RxVgA21-v33suYtOqjMyGo3Q/exec';
+  var MODE = (window.google && google.script && google.script.run) ? 'gas'
+    : /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'mock' : 'http';
+  var ready = new Promise(function (resolve) {
+    if (MODE !== 'mock') return resolve();
+    var s = document.createElement('script');
+    s.src = 'dev/mock.js';
+    s.onload = function () { window.MockReady.then(resolve); };
+    document.head.appendChild(s);
+  });
+  function pageBase() { return location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, ''); }
+  function api(name) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return ready.then(function () {
+      if (MODE === 'mock') return window.MockAPI[name].apply(null, args);
+      if (MODE === 'http') {
+        if (name === 'getAppUrl') return pageBase();
+        return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: name, args: args }) })
+          .then(function (r) { return r.json(); })
+          .then(function (j) { if (!j.ok) throw new Error(j.error); return j.data; });
+      }
+      return new Promise(function (res, rej) {
+        var r = google.script.run.withSuccessHandler(res).withFailureHandler(rej);
+        r[name].apply(r, args);
+      });
+    });
+  }
+
+  /* ───── 상태 ───── */
+  var cfg, A, SID = '', step = 0, EDIT = null;
+  var STEPS = ['기본 정보', '과정 만족도', '과목 평가', '의견 · 제출'];
+  var app = document.getElementById('app');
+
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } }
+  function draftKey() { return 'svy-draft-' + SID; }
+  function saveDraft() { store(draftKey(), JSON.stringify(A)); }
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function lastName(s) { var p = String(s || '').trim().split(/\s+/); return p[p.length - 1]; }
+
+  function emptyAnswers() {
+    var a = { demo: {}, other: {}, overall: cfg.overall.items.map(function () { return null; }), slots: {}, open: {} };
+    cfg.slots.forEach(function (s) { a.slots[s.id] = { choice: s.options.length === 1 ? 0 : null, scores: {} }; });
+    return a;
+  }
+
+  /* ───── 필수 항목 목록 (단계별) ───── */
+  function requiredList() {
+    var L = [[], [], [], []];
+    cfg.demographics.forEach(function (d) {
+      var v = A.demo[d.id];
+      L[0].push({ id: 'd-' + d.id, ok: !!v && (v !== '__other' || !!(A.other[d.id] || '').trim()) });
+    });
+    cfg.overall.items.forEach(function (_, i) { L[1].push({ id: 'o-' + i, ok: !!A.overall[i] }); });
+    cfg.slots.forEach(function (s) {
+      var a = A.slots[s.id];
+      var ok = a.choice != null && cfg.sessionItems.every(function (it) { return !!a.scores[it.key]; });
+      L[2].push({ id: 's-' + s.id, ok: ok, weight: (s.options.length > 1 ? 1 : 0) + cfg.sessionItems.length,
+        done: (a.choice != null && s.options.length > 1 ? 1 : 0) + cfg.sessionItems.filter(function (it) { return !!a.scores[it.key]; }).length });
+    });
+    return L;
+  }
+
+  function updateProgress() {
+    var L = requiredList(), total = 0, done = 0;
+    L.forEach(function (arr) { arr.forEach(function (r) { var w = r.weight || 1; total += w; done += r.weight ? r.done : (r.ok ? 1 : 0); }); });
+    var pct = total ? Math.round(done / total * 100) : 0;
+    var bar = document.getElementById('bar'); if (bar) bar.style.width = pct + '%';
+    var bt = document.getElementById('bar-txt'); if (bt) bt.textContent = '필수 응답 ' + done + ' / ' + total + ' (' + pct + '%)';
+    document.querySelectorAll('.step').forEach(function (el, i) {
+      el.classList.toggle('done', i !== step && L[i].length > 0 && L[i].every(function (r) { return r.ok; }));
+    });
+    L[2].forEach(function (r) { var c = document.getElementById(r.id); if (c) c.classList.toggle('complete', r.ok); });
+  }
+
+  /* ───── 렌더링 ───── */
+  // 왼쪽이 5점(매우 그렇다), 오른쪽이 1점(전혀 아니다). 저장 값은 그대로 1~5.
+  // 라벨은 다섯 개 모두 같은 굵기·색으로 (특정 선택지를 강조하면 응답이 쏠릴 수 있음)
+  function scaleHTML(name, labels, val, disabled) {
+    var h = '<div class="scale' + (disabled ? ' disabled' : '') + '" role="radiogroup">';
+    for (var v = 5; v >= 1; v--) {
+      h += '<label class="opt"><input type="radio" name="' + esc(name) + '" value="' + v + '" aria-label="' + esc(labels[v - 1]) + '"' + (val === v ? ' checked' : '') + (disabled ? ' disabled' : '') + '>' +
+        '<span><span class="lbl">' + esc(labels[v - 1]) + '</span><span class="dot"></span></span></label>';
+    }
+    return h + '</div>';
+  }
+
+  function render() {
+    var html = '<div class="top"><div class="top-in"><h1>' + esc(cfg.title) + '</h1><div class="steps">' +
+      STEPS.map(function (t, i) { return '<button type="button" class="step' + (i === step ? ' on' : '') + '" data-step="' + i + '"><b>' + (i + 1) + '</b>' + t + '</button>'; }).join('') +
+      '</div><div class="bar"><i id="bar"></i></div><div class="bar-txt" id="bar-txt"></div></div></div><main>' +
+      (EDIT ? '<div class="edit-banner">제출했던 응답을 수정하고 있어요. 다시 제출하면 기존 응답이 바뀌어요.</div>' : '');
+
+    if (step === 0) html += renderDemo();
+    if (step === 1) html += renderOverall();
+    if (step === 2) html += renderSlots();
+    if (step === 3) html += renderOpen();
+
+    html += '</main><div class="nav"><div class="nav-in">' +
+      (step > 0 ? '<button type="button" class="btn" id="prev">이전</button>' : '') +
+      (step < 3 ? '<button type="button" class="btn primary" id="next">다음</button>' : '<button type="button" class="btn primary" id="submit">' + (EDIT ? '수정 내용 제출' : '제출하기') + '</button>') +
+      '</div></div>';
+    app.innerHTML = html;
+    updateProgress();
+  }
+
+  function renderDemo() {
+    var h = '<div class="intro"><h2>' + esc(cfg.course || cfg.title) + ' ' + esc(cfg.cohort) + '</h2>' +
+      (cfg.period ? '<div class="meta">' + esc(cfg.period) + '</div>' : '') +
+      (cfg.intro ? '<p>' + esc(cfg.intro) + '</p>' : '') + '</div>';
+    h += '<div class="sec-title">기본 정보</div><p class="sec-desc">통계 분석에만 쓰이며, 개인을 식별하지 않습니다.</p><div class="card">';
+    cfg.demographics.forEach(function (d, i) {
+      var v = A.demo[d.id];
+      h += '<div class="q" id="d-' + esc(d.id) + '"><div class="qt"><span class="n">' + (i + 1) + '.</span>' + esc(d.label) + '<span class="req">*</span></div><div class="chips">' +
+        d.options.map(function (o) {
+          return '<label class="chip"><input type="radio" name="demo:' + esc(d.id) + '" value="' + esc(o) + '"' + (v === o ? ' checked' : '') + '><span>' + esc(o) + '</span></label>';
+        }).join('') +
+        (d.other ? '<label class="chip"><input type="radio" name="demo:' + esc(d.id) + '" value="__other"' + (v === '__other' ? ' checked' : '') + '><span>기타</span></label>' : '') +
+        '</div>' +
+        (d.other && v === '__other' ? '<input class="other-in" data-other="' + esc(d.id) + '" placeholder="' + esc(d.label) + ' 직접 입력 (예: 건축)" aria-label="' + esc(d.label) + ' 기타 내용" value="' + esc(A.other[d.id] || '') + '">' : '') +
+        '<div class="warn">' + (d.other && v === '__other' ? '기타 내용을 적어 주세요.' : '선택해 주세요.') + '</div></div>';
+    });
+    return h + '</div>';
+  }
+
+  function renderOverall() {
+    var labels = cfg.scales[cfg.overall.scale];
+    var h = '<div class="sec-title">과정 만족도</div><p class="sec-desc">교육과정과 연수 운영 전반에 대해 평가해 주세요.</p><div class="card">';
+    cfg.overall.items.forEach(function (it, i) {
+      h += '<div class="q" id="o-' + i + '"><div class="qt"><span class="n">' + (i + 1) + '.</span>' + esc(it.text) + '<span class="req">*</span></div>' +
+        scaleHTML('ov:' + i, labels, A.overall[i]) + '<div class="warn">응답해 주세요.</div></div>';
+    });
+    return h + '</div>';
+  }
+
+  function slotCard(s) {
+    var a = A.slots[s.id], split = s.options.length > 1, o = a.choice != null ? s.options[a.choice] : null;
+    var h = '<div class="card" id="s-' + esc(s.id) + '"><div class="sess-h"><span class="when">' + esc(s.time) + '</span><div>';
+    if (split) {
+      h += '<div class="sess-t">분반 수업<span class="split-badge">택 1</span></div><div class="sess-i">' + (o ? esc(o.title) + ' · ' + esc(o.instructor) : '수강한 분반을 선택해 주세요') + '</div>';
+    } else {
+      h += '<div class="sess-t">' + esc(o.title) + '</div><div class="sess-i">강사 ' + esc(o.instructor) + '</div>';
+    }
+    h += '</div><span class="done-mark" aria-hidden="true"></span></div>';
+    if (split) {
+      h += '<p class="pick-hint">내가 들은 수업을 고르세요 <span class="req">*</span></p><div class="pick">' + s.options.map(function (op, i) {
+        return '<label class="chip"><input type="radio" name="pick:' + esc(s.id) + '" value="' + i + '"' + (a.choice === i ? ' checked' : '') + '><span>' + esc(op.title) + '<small>' + esc(op.instructor) + '</small></span></label>';
+      }).join('') + '</div>';
+    }
+    cfg.sessionItems.forEach(function (it) {
+      h += '<div class="sq"><em>' + esc(it.key) + '</em>' + esc(it.text) + '</div>' +
+        scaleHTML('sl:' + s.id + ':' + it.key, cfg.scales[it.scale], a.scores[it.key], a.choice == null);
+    });
+    return h + '<div class="warn">' + (split ? '분반을 선택하고 ' : '') + '모든 문항에 응답해 주세요.</div></div>';
+  }
+
+  function renderSlots() {
+    var h = '<div class="sec-title">과목 평가</div><p class="sec-desc">시간표 순서대로 과목마다 교과편성과 강사를 평가해 주세요. 분반 수업은 들은 수업만 고르면 됩니다.</p>';
+    var lastDate = null;
+    cfg.slots.forEach(function (s) {
+      if (s.date !== lastDate) { h += '<div class="day">' + esc(s.date) + '</div>'; lastDate = s.date; }
+      h += slotCard(s);
+    });
+    return h;
+  }
+
+  function renderOpen() {
+    var h = '<div class="sec-title">의견</div><p class="sec-desc">선택 사항입니다. 구체적으로 적어 주시면 다음 연수에 꼭 반영하겠습니다.</p><div class="card">';
+    cfg.open.forEach(function (q, i) {
+      h += '<div class="q"><div class="qt"><span class="n">' + (i + 1) + '.</span>' + esc(q.text) + '<span class="opt-note">(선택)</span></div>' +
+        '<textarea data-open="' + esc(q.id) + '" maxlength="2000">' + esc(A.open[q.id] || '') + '</textarea></div>';
+    });
+    return h + '</div>';
+  }
+
+  /* ───── 이벤트 ───── */
+  app.addEventListener('change', function (e) {
+    var t = e.target, n = t.name || '', p = n.split(':');
+    if (p[0] === 'demo') {
+      A.demo[p[1]] = t.value;
+      var d = cfg.demographics.filter(function (x) { return x.id === p[1]; })[0];
+      if (d && d.other) { render(); if (t.value === '__other') { var oi = app.querySelector('[data-other="' + p[1] + '"]'); if (oi) oi.focus(); } }
+    } else if (p[0] === 'ov') {
+      A.overall[+p[1]] = +t.value;
+    } else if (p[0] === 'pick') {
+      A.slots[p[1]].choice = +t.value;
+      var card = document.getElementById('s-' + p[1]);
+      var tmp = document.createElement('div'); tmp.innerHTML = slotCard(cfg.slots.filter(function (s) { return s.id === p[1]; })[0]);
+      card.replaceWith(tmp.firstChild);
+      var first = document.querySelector('#s-' + CSS.escape(p[1]) + ' .scale input'); if (first) first.focus({ preventScroll: true });
+    } else if (p[0] === 'sl') {
+      A.slots[p[1]].scores[p.slice(2).join(':')] = +t.value;
+    }
+    clearMissing(t);
+    saveDraft(); updateProgress();
+  });
+  app.addEventListener('input', function (e) {
+    var t = e.target;
+    if (t.dataset.other) { A.other[t.dataset.other] = t.value; clearMissing(t); }
+    if (t.dataset.open) A.open[t.dataset.open] = t.value;
+    saveDraft(); updateProgress();
+  });
+  app.addEventListener('click', function (e) {
+    var t = e.target.closest('button'); if (!t) return;
+    if (t.id === 'next') go(step + 1, true);
+    else if (t.id === 'prev') go(step - 1, false);
+    else if (t.id === 'submit') submit();
+    else if (t.dataset.step != null) { var to = +t.dataset.step; go(to, to > step); }
+  });
+
+  function clearMissing(t) {
+    var q = t.closest('.q.missing, .card.missing');
+    if (!q) return;
+    var r = requiredList()[step].filter(function (x) { return x.id === q.id; })[0];
+    if (!r || r.ok) q.classList.remove('missing');
+  }
+
+  function markMissing(i) {
+    var miss = requiredList()[i].filter(function (r) { return !r.ok; });
+    miss.forEach(function (r) { var el = document.getElementById(r.id); if (el) el.classList.add('missing'); });
+    if (miss.length) {
+      var el = document.getElementById(miss[0].id);
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); var inp = el.querySelector('input:not(:disabled)'); if (inp) setTimeout(function () { inp.focus({ preventScroll: true }); }, 300); }
+      toast('응답하지 않은 필수 문항이 ' + miss.length + '개 있어요.');
+    }
+    return miss.length;
+  }
+
+  function go(to, validate) {
+    if (to < 0 || to > 3) return;
+    if (validate) {
+      for (var i = step; i < to; i++) {
+        if (i !== step) { step = i; render(); }
+        if (markMissing(i)) return;
+      }
+    }
+    step = to; render(); window.scrollTo(0, 0);
+  }
+
+  function toast(msg) {
+    var t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
+    clearTimeout(toast._t); toast._t = setTimeout(function () { t.style.display = 'none'; }, 2600);
+  }
+
+  function submit() {
+    var L = requiredList();
+    for (var i = 0; i < 3; i++) {
+      if (L[i].some(function (r) { return !r.ok; })) { step = i; render(); markMissing(i); return; }
+    }
+    var demo = {}, other = {};
+    cfg.demographics.forEach(function (d) {
+      if (A.demo[d.id] === '__other') { demo[d.id] = '기타'; other[d.id] = A.other[d.id].trim(); }
+      else demo[d.id] = A.demo[d.id];
+    });
+    var payload = { demo: demo, other: other, overall: A.overall, slots: A.slots, open: A.open };
+    var btn = document.getElementById('submit'); btn.disabled = true; btn.textContent = '제출 중…';
+    api('submitResponse', SID, payload, EDIT).then(function (res) {
+      store(draftKey(), null);
+      // 수정 열쇠는 이 기기에만 저장 → 같은 사람만 자기 응답을 고칠 수 있음
+      store('svy-done-' + SID, JSON.stringify({ id: res.id, token: res.token, answers: A }));
+      var wasEdit = !!EDIT; EDIT = null;
+      showDone(false, wasEdit);
+    }).catch(function (err) {
+      btn.disabled = false; btn.textContent = EDIT ? '수정 내용 제출' : '제출하기';
+      toast('제출하지 못했어요: ' + ((err && err.message) || err) + ' 잠시 후 다시 눌러 주세요.');
+    });
+  }
+
+  function doneRecord() {
+    try { var r = JSON.parse(store('svy-done-' + SID) || 'null'); return r && r.id && r.token && r.answers ? r : null; } catch (e) { return null; }
+  }
+
+  // 제출 후 화면: 새 응답(다른 사람)은 받지 않고, 본인 응답 수정만 허용
+  function showDone(again, edited) {
+    // 주의: 스크립트 안에 SVG 태그를 직접 쓰면 Apps Script에서 페이지가 깨짐 → 체크 표시는 CSS 배경으로
+    var rec = doneRecord();
+    app.innerHTML = '<div class="center"><div class="big-check"></div>' +
+      '<h2>' + (again ? '이미 제출하셨어요' : edited ? '수정 완료!' : '제출 완료!') + '</h2><p>소중한 의견 감사합니다.<br>' + esc(cfg.course || '') + ' ' + esc(cfg.cohort) + ' 연수에 참여해 주셔서 고맙습니다.</p>' +
+      (rec ? '<button type="button" class="btn" id="edit-mine" style="max-width:260px">내 응답 수정하기</button><p class="edit-note">수정하면 기존 응답이 새 내용으로 바뀌어요.</p>' : '') + '</div>';
+    var b = document.getElementById('edit-mine');
+    if (b) b.onclick = function () {
+      var r = doneRecord(); if (!r) return;
+      A = r.answers; EDIT = { id: r.id, token: r.token }; step = 0; render(); window.scrollTo(0, 0);
+    };
+  }
+
+  /* ───── 시작 ───── */
+  // 주소의 ?s=설문ID 읽기 (Apps Script에서는 google.script.url로만 읽을 수 있음)
+  function surveyParam() {
+    return ready.then(function () {
+      if (MODE === 'http') return new URLSearchParams(location.search).get('s') || '';
+      if (window.MockAPI) return window.MockAPI.getLocationParam('s');
+      return new Promise(function (res) { google.script.url.getLocation(function (loc) { res((loc.parameter || {}).s || ''); }); });
+    });
+  }
+
+  function showChooser() {
+    return Promise.all([api('listOpenSurveys'), api('getAppUrl')]).then(function (r) {
+      var list = r[0], base = r[1];
+      app.innerHTML = '<main><div class="intro"><h2>진행 중인 설문</h2><p>참여할 설문을 선택해 주세요.</p></div>' +
+        (list.length ? list.map(function (s) {
+          return '<a class="card pick-survey" href="' + esc(base + '?s=' + encodeURIComponent(s.id)) + '" target="_top"><div class="sess-t">' + esc(s.title) + '</div>' +
+            '<div class="sess-i">' + esc([s.course, s.cohort].filter(Boolean).join(' · ')) + '</div></a>';
+        }).join('') : '<div class="center"><p>지금 진행 중인 설문이 없어요.</p></div>') + '</main>';
+    });
+  }
+
+  surveyParam().then(function (sid) {
+    if (!sid) return showChooser();
+    SID = sid;
+    return api('getSurvey', sid).then(function (r) {
+      cfg = r.config;
+      document.title = cfg.title;
+      if (r.status !== '진행 중') {
+        app.innerHTML = '<div class="center"><h2>마감된 설문이에요</h2><p>' + esc(cfg.title) + '<br>응답 기간이 끝났습니다. 참여해 주셔서 감사합니다.</p></div>';
+        return;
+      }
+      start();
+    });
+  }).catch(function (err) {
+    app.innerHTML = '<div class="center"><h2>설문을 불러오지 못했어요</h2><p>' + esc((err && err.message) || err) + '</p></div>';
+  });
+
+  function start() {
+    if (store('svy-done-' + SID)) return showDone(true);
+    A = emptyAnswers();
+    try {
+      var d = JSON.parse(store(draftKey()) || 'null');
+      if (d && d.overall && d.overall.length === A.overall.length) {
+        A.demo = d.demo || {}; A.other = d.other || {}; A.overall = d.overall; A.open = d.open || {};
+        cfg.slots.forEach(function (s) { if (d.slots && d.slots[s.id] && (d.slots[s.id].choice == null || s.options[d.slots[s.id].choice])) A.slots[s.id] = d.slots[s.id]; });
+      }
+    } catch (e) { /* 저장된 임시 응답 무시 */ }
+    render();
+  }
+})();
+</script>
+</body>
+</html>
