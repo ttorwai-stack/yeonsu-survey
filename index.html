@@ -156,15 +156,37 @@
     document.head.appendChild(s);
   });
   function pageBase() { return location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, ''); }
+  // 서버 혼잡(BUSY)이나 구글 쪽 일시 오류는 자동으로 다시 시도한다.
+  // 제출(submitResponse)은 저장되지 않은 것이 확실한 경우(BUSY, 서버가 요청을 거절)에만 다시 보낸다.
+  function httpCall(name, args, attempt) {
+    attempt = attempt || 0;
+    var waits = [1500, 3000, 5000, 8000];
+    var retry = function (why) {
+      if (attempt >= waits.length) throw why;
+      return new Promise(function (r) { setTimeout(r, waits[attempt] + Math.random() * 1000); })
+        .then(function () { return httpCall(name, args, attempt + 1); });
+    };
+    return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: name, args: args }) })
+      .then(function (r) {
+        return r.text().then(function (t) {
+          var j;
+          try { j = JSON.parse(t); } catch (e) { return retry(new Error('서버가 바빠요. 잠시 후 다시 눌러 주세요.')); } // 구글이 실행 전에 거절(HTML 오류)
+          if (j.ok) return j.data;
+          if (/^BUSY/.test(j.error)) return retry(new Error(j.error.replace(/^BUSY:\s*/, '')));
+          throw new Error(j.error);
+        });
+      }, function (netErr) {
+        if (name === 'submitResponse') throw new Error('인터넷 연결을 확인해 주세요.'); // 저장됐는지 모르므로 자동 재전송하지 않음
+        return retry(netErr);
+      });
+  }
   function api(name) {
     var args = Array.prototype.slice.call(arguments, 1);
     return ready.then(function () {
       if (MODE === 'mock') return window.MockAPI[name].apply(null, args);
       if (MODE === 'http') {
         if (name === 'getAppUrl') return pageBase();
-        return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: name, args: args }) })
-          .then(function (r) { return r.json(); })
-          .then(function (j) { if (!j.ok) throw new Error(j.error); return j.data; });
+        return httpCall(name, args);
       }
       return new Promise(function (res, rej) {
         var r = google.script.run.withSuccessHandler(res).withFailureHandler(rej);
@@ -175,8 +197,27 @@
 
   /* ───── 상태 ───── */
   var cfg, A, SID = '', step = 0, EDIT = null;
-  var STEPS = ['기본 정보', '과정 만족도', '과목 평가', '의견 · 제출'];
   var app = document.getElementById('app');
+
+  // 화면 문구: 설정(cfg.texts)에 있으면 그 값, 비어 있으면 기본값 (Code.gs defaultTexts_와 같은 값)
+  var DEFAULT_TEXTS = {
+    demoTitle: '기본 정보', demoDesc: '통계 분석에만 쓰이며, 개인을 식별하지 않습니다.',
+    overallTitle: '과정 만족도', overallDesc: '교육과정과 연수 운영 전반에 대해 평가해 주세요.',
+    slotsTitle: '과목 평가', slotsDesc: '시간표 순서대로 과목마다 평가해 주세요. 분반 수업은 들은 수업만 고르면 됩니다.',
+    splitHint: '내가 들은 수업을 고르세요',
+    openTitle: '의견', openDesc: '구체적으로 적어 주시면 다음 연수에 꼭 반영하겠습니다.',
+    doneMsg: '소중한 의견 감사합니다.'
+  };
+  function T(k) { var t = cfg && cfg.texts && cfg.texts[k]; return (t != null && String(t).trim() !== '') ? String(t) : DEFAULT_TEXTS[k]; }
+  function normalize(c) {
+    c.demographics = c.demographics || []; c.slots = c.slots || []; c.open = c.open || []; c.sessionItems = c.sessionItems || [];
+    c.overall = c.overall || { scale: 'agree', items: [] }; c.overall.items = c.overall.items || [];
+    return c;
+  }
+  // 단계: 0 기본정보 / 1 과정만족도 / 2 과목평가 / 3 의견·제출. 문항이 없는 단계는 건너뛴다.
+  function stepNames() { return [T('demoTitle'), T('overallTitle'), T('slotsTitle'), cfg.open.length ? T('openTitle') + ' · 제출' : '제출']; }
+  function active() { return [cfg.demographics.length > 0, cfg.overall.items.length > 0, cfg.slots.length > 0, true]; }
+  function firstStep() { return active().indexOf(true); }
 
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } }
   function draftKey() { return 'svy-draft-' + SID; }
@@ -205,6 +246,7 @@
       L[2].push({ id: 's-' + s.id, ok: ok, weight: (s.options.length > 1 ? 1 : 0) + cfg.sessionItems.length,
         done: (a.choice != null && s.options.length > 1 ? 1 : 0) + cfg.sessionItems.filter(function (it) { return !!a.scores[it.key]; }).length });
     });
+    cfg.open.forEach(function (q) { if (q.required) L[3].push({ id: 'q-' + q.id, ok: !!String(A.open[q.id] || '').trim() }); });
     return L;
   }
 
@@ -214,7 +256,8 @@
     var pct = total ? Math.round(done / total * 100) : 0;
     var bar = document.getElementById('bar'); if (bar) bar.style.width = pct + '%';
     var bt = document.getElementById('bar-txt'); if (bt) bt.textContent = '필수 응답 ' + done + ' / ' + total + ' (' + pct + '%)';
-    document.querySelectorAll('.step').forEach(function (el, i) {
+    document.querySelectorAll('.step').forEach(function (el) {
+      var i = +el.dataset.step;
       el.classList.toggle('done', i !== step && L[i].length > 0 && L[i].every(function (r) { return r.ok; }));
     });
     L[2].forEach(function (r) { var c = document.getElementById(r.id); if (c) c.classList.toggle('complete', r.ok); });
@@ -233,29 +276,44 @@
   }
 
   function render() {
+    var act = active(), n = 0, names = stepNames();
     var html = '<div class="top"><div class="top-in"><h1>' + esc(cfg.title) + '</h1><div class="steps">' +
-      STEPS.map(function (t, i) { return '<button type="button" class="step' + (i === step ? ' on' : '') + '" data-step="' + i + '"><b>' + (i + 1) + '</b>' + t + '</button>'; }).join('') +
+      names.map(function (t, i) {
+        if (!act[i]) return '';
+        n++;
+        return '<button type="button" class="step' + (i === step ? ' on' : '') + '" data-step="' + i + '"><b>' + n + '</b>' + esc(t) + '</button>';
+      }).join('') +
       '</div><div class="bar"><i id="bar"></i></div><div class="bar-txt" id="bar-txt"></div></div></div><main>' +
       (EDIT ? '<div class="edit-banner">제출했던 응답을 수정하고 있어요. 다시 제출하면 기존 응답이 바뀌어요.</div>' : '');
 
+    if (step === firstStep()) html += renderIntro();
     if (step === 0) html += renderDemo();
     if (step === 1) html += renderOverall();
     if (step === 2) html += renderSlots();
     if (step === 3) html += renderOpen();
 
+    var hasPrev = act.slice(0, step).some(Boolean);
     html += '</main><div class="nav"><div class="nav-in">' +
-      (step > 0 ? '<button type="button" class="btn" id="prev">이전</button>' : '') +
+      (hasPrev ? '<button type="button" class="btn" id="prev">이전</button>' : '') +
       (step < 3 ? '<button type="button" class="btn primary" id="next">다음</button>' : '<button type="button" class="btn primary" id="submit">' + (EDIT ? '수정 내용 제출' : '제출하기') + '</button>') +
       '</div></div>';
     app.innerHTML = html;
     updateProgress();
   }
 
-  function renderDemo() {
-    var h = '<div class="intro"><h2>' + esc(cfg.course || cfg.title) + ' ' + esc(cfg.cohort) + '</h2>' +
+  function renderIntro() {
+    return '<div class="intro"><h2>' + esc([cfg.course, cfg.cohort].filter(Boolean).join(' ') || cfg.title) + '</h2>' +
       (cfg.period ? '<div class="meta">' + esc(cfg.period) + '</div>' : '') +
       (cfg.intro ? '<p>' + esc(cfg.intro) + '</p>' : '') + '</div>';
-    h += '<div class="sec-title">기본 정보</div><p class="sec-desc">통계 분석에만 쓰이며, 개인을 식별하지 않습니다.</p><div class="card">';
+  }
+
+  function secHead(titleKey, descKey) {
+    var d = T(descKey);
+    return '<div class="sec-title">' + esc(T(titleKey)) + '</div>' + (d ? '<p class="sec-desc">' + esc(d) + '</p>' : '');
+  }
+
+  function renderDemo() {
+    var h = secHead('demoTitle', 'demoDesc') + '<div class="card">';
     cfg.demographics.forEach(function (d, i) {
       var v = A.demo[d.id];
       h += '<div class="q" id="d-' + esc(d.id) + '"><div class="qt"><span class="n">' + (i + 1) + '.</span>' + esc(d.label) + '<span class="req">*</span></div><div class="chips">' +
@@ -264,7 +322,7 @@
         }).join('') +
         (d.other ? '<label class="chip"><input type="radio" name="demo:' + esc(d.id) + '" value="__other"' + (v === '__other' ? ' checked' : '') + '><span>기타</span></label>' : '') +
         '</div>' +
-        (d.other && v === '__other' ? '<input class="other-in" data-other="' + esc(d.id) + '" placeholder="' + esc(d.label) + ' 직접 입력 (예: 건축)" aria-label="' + esc(d.label) + ' 기타 내용" value="' + esc(A.other[d.id] || '') + '">' : '') +
+        (d.other && v === '__other' ? '<input class="other-in" data-other="' + esc(d.id) + '" placeholder="' + esc(d.placeholder || '직접 입력') + '" aria-label="' + esc(d.label) + ' 기타 내용" value="' + esc(A.other[d.id] || '') + '">' : '') +
         '<div class="warn">' + (d.other && v === '__other' ? '기타 내용을 적어 주세요.' : '선택해 주세요.') + '</div></div>';
     });
     return h + '</div>';
@@ -272,7 +330,7 @@
 
   function renderOverall() {
     var labels = cfg.scales[cfg.overall.scale];
-    var h = '<div class="sec-title">과정 만족도</div><p class="sec-desc">교육과정과 연수 운영 전반에 대해 평가해 주세요.</p><div class="card">';
+    var h = secHead('overallTitle', 'overallDesc') + '<div class="card">';
     cfg.overall.items.forEach(function (it, i) {
       h += '<div class="q" id="o-' + i + '"><div class="qt"><span class="n">' + (i + 1) + '.</span>' + esc(it.text) + '<span class="req">*</span></div>' +
         scaleHTML('ov:' + i, labels, A.overall[i]) + '<div class="warn">응답해 주세요.</div></div>';
@@ -286,11 +344,11 @@
     if (split) {
       h += '<div class="sess-t">분반 수업<span class="split-badge">택 1</span></div><div class="sess-i">' + (o ? esc(o.title) + ' · ' + esc(o.instructor) : '수강한 분반을 선택해 주세요') + '</div>';
     } else {
-      h += '<div class="sess-t">' + esc(o.title) + '</div><div class="sess-i">강사 ' + esc(o.instructor) + '</div>';
+      h += '<div class="sess-t">' + esc(o.title) + '</div>' + (o.instructor ? '<div class="sess-i">강사 ' + esc(o.instructor) + '</div>' : '');
     }
     h += '</div><span class="done-mark" aria-hidden="true"></span></div>';
     if (split) {
-      h += '<p class="pick-hint">내가 들은 수업을 고르세요 <span class="req">*</span></p><div class="pick">' + s.options.map(function (op, i) {
+      h += '<p class="pick-hint">' + esc(T('splitHint')) + ' <span class="req">*</span></p><div class="pick">' + s.options.map(function (op, i) {
         return '<label class="chip"><input type="radio" name="pick:' + esc(s.id) + '" value="' + i + '"' + (a.choice === i ? ' checked' : '') + '><span>' + esc(op.title) + '<small>' + esc(op.instructor) + '</small></span></label>';
       }).join('') + '</div>';
     }
@@ -302,7 +360,7 @@
   }
 
   function renderSlots() {
-    var h = '<div class="sec-title">과목 평가</div><p class="sec-desc">시간표 순서대로 과목마다 교과편성과 강사를 평가해 주세요. 분반 수업은 들은 수업만 고르면 됩니다.</p>';
+    var h = secHead('slotsTitle', 'slotsDesc');
     var lastDate = null;
     cfg.slots.forEach(function (s) {
       if (s.date !== lastDate) { h += '<div class="day">' + esc(s.date) + '</div>'; lastDate = s.date; }
@@ -312,10 +370,13 @@
   }
 
   function renderOpen() {
-    var h = '<div class="sec-title">의견</div><p class="sec-desc">선택 사항입니다. 구체적으로 적어 주시면 다음 연수에 꼭 반영하겠습니다.</p><div class="card">';
+    if (!cfg.open.length) return '<div class="center" style="padding:30px 10px"><p>모든 문항에 응답하셨어요. 아래 [제출하기]를 눌러 주세요.</p></div>';
+    var h = secHead('openTitle', 'openDesc') + '<div class="card">';
     cfg.open.forEach(function (q, i) {
-      h += '<div class="q"><div class="qt"><span class="n">' + (i + 1) + '.</span>' + esc(q.text) + '<span class="opt-note">(선택)</span></div>' +
-        '<textarea data-open="' + esc(q.id) + '" maxlength="2000">' + esc(A.open[q.id] || '') + '</textarea></div>';
+      h += '<div class="q" id="q-' + esc(q.id) + '"><div class="qt"><span class="n">' + (i + 1) + '.</span>' + esc(q.text) +
+        (q.required ? '<span class="req">*</span>' : '<span class="opt-note">(선택)</span>') + '</div>' +
+        '<textarea data-open="' + esc(q.id) + '" maxlength="2000">' + esc(A.open[q.id] || '') + '</textarea>' +
+        (q.required ? '<div class="warn">응답해 주세요.</div>' : '') + '</div>';
     });
     return h + '</div>';
   }
@@ -344,7 +405,7 @@
   app.addEventListener('input', function (e) {
     var t = e.target;
     if (t.dataset.other) { A.other[t.dataset.other] = t.value; clearMissing(t); }
-    if (t.dataset.open) A.open[t.dataset.open] = t.value;
+    if (t.dataset.open) { A.open[t.dataset.open] = t.value; clearMissing(t); }
     saveDraft(); updateProgress();
   });
   app.addEventListener('click', function (e) {
@@ -367,16 +428,19 @@
     miss.forEach(function (r) { var el = document.getElementById(r.id); if (el) el.classList.add('missing'); });
     if (miss.length) {
       var el = document.getElementById(miss[0].id);
-      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); var inp = el.querySelector('input:not(:disabled)'); if (inp) setTimeout(function () { inp.focus({ preventScroll: true }); }, 300); }
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); var inp = el.querySelector('input:not(:disabled), textarea'); if (inp) setTimeout(function () { inp.focus({ preventScroll: true }); }, 300); }
       toast('응답하지 않은 필수 문항이 ' + miss.length + '개 있어요.');
     }
     return miss.length;
   }
 
   function go(to, validate) {
-    if (to < 0 || to > 3) return;
+    var act = active(), dir = to > step ? 1 : -1;
+    while (to >= 0 && to <= 3 && !act[to]) to += dir; // 문항 없는 단계는 건너뜀
+    if (to < 0 || to > 3 || to === step) return;
     if (validate) {
       for (var i = step; i < to; i++) {
+        if (!act[i]) continue;
         if (i !== step) { step = i; render(); }
         if (markMissing(i)) return;
       }
@@ -391,7 +455,7 @@
 
   function submit() {
     var L = requiredList();
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0; i < 4; i++) {
       if (L[i].some(function (r) { return !r.ok; })) { step = i; render(); markMissing(i); return; }
     }
     var demo = {}, other = {};
@@ -422,12 +486,12 @@
     // 주의: 스크립트 안에 SVG 태그를 직접 쓰면 Apps Script에서 페이지가 깨짐 → 체크 표시는 CSS 배경으로
     var rec = doneRecord();
     app.innerHTML = '<div class="center"><div class="big-check"></div>' +
-      '<h2>' + (again ? '이미 제출하셨어요' : edited ? '수정 완료!' : '제출 완료!') + '</h2><p>소중한 의견 감사합니다.<br>' + esc(cfg.course || '') + ' ' + esc(cfg.cohort) + ' 연수에 참여해 주셔서 고맙습니다.</p>' +
+      '<h2>' + (again ? '이미 제출하셨어요' : edited ? '수정 완료!' : '제출 완료!') + '</h2><p>' + esc(T('doneMsg')) + '<br>' + esc(cfg.course || '') + ' ' + esc(cfg.cohort) + ' 연수에 참여해 주셔서 고맙습니다.</p>' +
       (rec ? '<button type="button" class="btn" id="edit-mine" style="max-width:260px">내 응답 수정하기</button><p class="edit-note">수정하면 기존 응답이 새 내용으로 바뀌어요.</p>' : '') + '</div>';
     var b = document.getElementById('edit-mine');
     if (b) b.onclick = function () {
       var r = doneRecord(); if (!r) return;
-      A = r.answers; EDIT = { id: r.id, token: r.token }; step = 0; render(); window.scrollTo(0, 0);
+      A = r.answers; EDIT = { id: r.id, token: r.token }; step = firstStep(); render(); window.scrollTo(0, 0);
     };
   }
 
@@ -456,7 +520,7 @@
     if (!sid) return showChooser();
     SID = sid;
     return api('getSurvey', sid).then(function (r) {
-      cfg = r.config;
+      cfg = normalize(r.config);
       document.title = cfg.title;
       if (r.status !== '진행 중') {
         app.innerHTML = '<div class="center"><h2>마감된 설문이에요</h2><p>' + esc(cfg.title) + '<br>응답 기간이 끝났습니다. 참여해 주셔서 감사합니다.</p></div>';
@@ -478,6 +542,7 @@
         cfg.slots.forEach(function (s) { if (d.slots && d.slots[s.id] && (d.slots[s.id].choice == null || s.options[d.slots[s.id].choice])) A.slots[s.id] = d.slots[s.id]; });
       }
     } catch (e) { /* 저장된 임시 응답 무시 */ }
+    step = firstStep();
     render();
   }
 })();
