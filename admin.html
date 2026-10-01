@@ -161,7 +161,7 @@
   });
   function pageBase() { return location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, ''); }
   // 서버 혼잡(BUSY)이나 구글 쪽 일시 오류는 자동으로 다시 시도한다.
-  // 제출(submitResponse)은 저장되지 않은 것이 확실한 경우(BUSY, 서버가 요청을 거절)에만 다시 보낸다.
+  // 제출은 화면이 만든 응답ID로 보내므로 다시 보내도 서버에서 하나만 저장된다.
   function httpCall(name, args, attempt) {
     attempt = attempt || 0;
     var waits = [1500, 3000, 5000, 8000];
@@ -170,8 +170,12 @@
       return new Promise(function (r) { setTimeout(r, waits[attempt] + Math.random() * 1000); })
         .then(function () { return httpCall(name, args, attempt + 1); });
     };
-    return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: name, args: args }) })
+    // 30초 넘게 답이 없으면 끊고 다시 시도 (제출도 응답ID가 같아 서버에서 하나만 저장됨)
+    var ctl = window.AbortController ? new AbortController() : null;
+    var timer = ctl ? setTimeout(function () { ctl.abort(); }, 30000) : null;
+    return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: name, args: args }), signal: ctl ? ctl.signal : undefined })
       .then(function (r) {
+        clearTimeout(timer);
         return r.text().then(function (t) {
           var j;
           try { j = JSON.parse(t); } catch (e) { return retry(new Error('서버가 바빠요. 잠시 후 다시 눌러 주세요.')); } // 구글이 실행 전에 거절(HTML 오류)
@@ -180,8 +184,8 @@
           throw new Error(j.error);
         });
       }, function (netErr) {
-        if (name === 'submitResponse') throw new Error('인터넷 연결을 확인해 주세요.'); // 저장됐는지 모르므로 자동 재전송하지 않음
-        return retry(netErr);
+        clearTimeout(timer);
+        return retry(new Error('인터넷 연결을 확인해 주세요.'));
       });
   }
   function api(name) {
