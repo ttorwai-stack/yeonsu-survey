@@ -129,8 +129,46 @@
     .form { grid-template-columns: 1fr; }
     .form label { padding-top: 0; }
   }
+  /* 과목별 그래프 보기 선택 */
+  .crv-bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 0 0 10px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg-b { border: 0; background: var(--surface); padding: 6px 11px; font-size: 13px; cursor: pointer; color: var(--ink-2); border-right: 1px solid var(--line); }
+  .seg-b:last-child { border-right: 0; }
+  .seg-b.on { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
+
+  /* 보고서 미리보기 (A4 폭) */
+  #report-wrap { position: fixed; inset: 0; z-index: 50; background: #e7e6e1; overflow: auto; }
+  .rp-bar { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--line); font-size: 13.5px; }
+  .rp-tip { color: var(--ink-2); margin-right: auto; }
+  #report { width: 794px; max-width: calc(100% - 32px); margin: 20px auto 40px; padding: 52px 52px 60px; background: #fff; color: #111; font-size: 12.5px; line-height: 1.55; box-shadow: 0 2px 14px rgba(0,0,0,.12); }
+  #report .rp-head { border-bottom: 3px solid #111; padding-bottom: 14px; margin-bottom: 8px; }
+  #report .rp-kicker { font-size: 12px; color: #555; font-weight: 600; }
+  #report h1 { font-size: 22px; margin: 4px 0 6px; line-height: 1.3; }
+  #report .rp-meta { color: #444; }
+  #report h2 { font-size: 16px; margin: 26px 0 10px; padding-bottom: 5px; border-bottom: 1.5px solid #333; break-after: avoid; page-break-after: avoid; }
+  #report h3 { font-size: 13.5px; margin: 16px 0 6px; break-after: avoid; page-break-after: avoid; }
+  #report h4 { font-size: 12.5px; margin: 0 0 4px; }
+  .rp-fig { margin: 6px 0 12px; break-inside: avoid; page-break-inside: avoid; }
+  .rp-fig img { display: block; width: 100%; height: auto; }
+  .rp-cap { font-size: 11px; color: #666; margin-top: 3px; }
+  .rp-tbl { width: 100%; border-collapse: collapse; font-size: 11.5px; margin: 4px 0 10px; }
+  .rp-tbl th, .rp-tbl td { border: 1px solid #d5d3cc; padding: 4px 6px; text-align: left; vertical-align: top; }
+  .rp-tbl th { background: #f2f1ed; font-weight: 700; }
+  .rp-tbl .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .rp-tbl tr { break-inside: avoid; page-break-inside: avoid; }
+  .rp-keep { break-inside: avoid; page-break-inside: avoid; }
+  .rp-demo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 14px; }
+  .rp-demo-i { break-inside: avoid; page-break-inside: avoid; }
+  .rp-cnt { font-weight: 400; color: #666; font-size: 11.5px; }
+  .rp-open { margin: 4px 0 10px; padding-left: 20px; }
+  .rp-open li { margin: 0 0 5px; white-space: pre-wrap; break-inside: avoid; page-break-inside: avoid; }
+
   @media print {
     @page { size: A4; margin: 12mm; }
+    body.reporting > :not(#report-wrap) { display: none !important; }
+    body.reporting #report-wrap { position: static; overflow: visible; background: #fff; }
+    body.reporting .rp-bar { display: none !important; }
+    body.reporting #report { width: auto; max-width: none; margin: 0; padding: 0; box-shadow: none; }
     body { background: #fff; font-size: 12px; }
     header.top, .toolbar .btn, .toolbar select, .card-h .act, .no-print { display: none !important; }
     .card, .kpi { border-color: #ddd; }
@@ -243,13 +281,22 @@
   // PNG 저장 시 흰 배경
   var whiteBg = { id: 'whiteBg', beforeDraw: function (c) { var x = c.ctx; x.save(); x.globalCompositeOperation = 'destination-over'; x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.restore(); } };
   // 가로 막대 끝에 값 표시 (이미지로 저장해도 숫자가 보이도록)
+  // 막대 끝 바깥에 자리가 없으면(만점 근처) 막대 안쪽에 흰 글씨로 → 숫자가 잘리지 않는다
   var endLabels = { id: 'endLabels', afterDatasetsDraw: function (c) {
-    var x = c.ctx; x.save(); x.font = '600 11px "Pretendard Variable", Pretendard, system-ui, sans-serif'; x.fillStyle = '#52514e'; x.textBaseline = 'middle';
+    var x = c.ctx, area = c.chartArea; x.save(); x.font = '600 11px "Pretendard Variable", Pretendard, system-ui, sans-serif'; x.textBaseline = 'middle';
     c.data.datasets.forEach(function (ds, di) {
-      c.getDatasetMeta(di).data.forEach(function (bar, i) { var v = ds.data[i]; if (v != null) x.fillText(Number(v).toFixed(2), bar.x + 5, bar.y); });
+      var meta = c.getDatasetMeta(di); if (meta.hidden) return;
+      meta.data.forEach(function (bar, i) {
+        var v = ds.data[i]; if (v == null) return;
+        var s = Number(v).toFixed(2), w = x.measureText(s).width;
+        if (bar.x + 6 + w <= area.right) { x.fillStyle = '#52514e'; x.textAlign = 'left'; x.fillText(s, bar.x + 5, bar.y); }
+        else { x.fillStyle = '#ffffff'; x.textAlign = 'right'; x.fillText(s, bar.x - 6, bar.y); }
+      });
     });
     x.restore();
   } };
+  // 과목별 그래프 보기 방식 (지표: both | 0 | 1 …, 정렬: pos 시간표순 | desc 높은 순 | asc 낮은 순)
+  var CRV = { metric: 'both', sort: 'pos' };
 
   /* ───── 로그인 ───── */
   function showLogin(msg) {
@@ -484,7 +531,7 @@
 
     var h = '<div class="toolbar"><div class="grow"><h2>' + esc(cohort) + ' 결과</h2><div class="sub">응답 ' + S.n + '명 · 점수는 5점 만점 평균, 만족 비율은 4~5점 응답 비율</div></div>' +
       (cs.length > 1 ? '<select id="cohort" aria-label="기수 선택">' + cs.map(function (c) { return '<option' + (c === cohort ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>' : '') +
-      '<button class="btn" id="reload">새로고침</button><button class="btn" id="print">인쇄 / PDF</button><button class="btn primary" id="xlsx">엑셀 다운로드</button></div>';
+      '<button class="btn" id="reload">새로고침</button><button class="btn" id="print">보고서 PDF</button><button class="btn primary" id="xlsx">엑셀 다운로드</button></div>';
 
     h += '<div class="kpis">' +
       kpi('응답자', S.n, '명', '') +
@@ -505,8 +552,12 @@
 
     if (S.courses.length) {
     h += '<div class="sec">' + esc(txt(D.config, 'slotsTitle')) + '</div>';
-    h += chartCard('c-cr', '과목별 평균 점수', '1~5점 척도 · 분반 과목은 해당 분반 수강자만 응답', 60 + S.courses.length * 42,
-      legendHTML(S.itemKeys.map(function (k, i) { return [k, SERIES[i]]; })));
+    var seg = function (key, opts) { return '<div class="seg" role="group">' + opts.map(function (o) { return '<button type="button" class="seg-b" data-crv="' + key + ':' + o[0] + '">' + esc(o[1]) + '</button>'; }).join('') + '</div>'; };
+    h += chartCard('c-cr', '과목별 평균 점수', '1~5점 척도 · 분반 과목은 해당 분반 수강자만 응답 · 점수순으로 보면 순위가 붙어요', 60 + S.courses.length * 42,
+      '<div class="crv-bar">' +
+      seg('metric', [['both', S.itemKeys.join('+')]].concat(S.itemKeys.map(function (k, i) { return [String(i), k]; }))) +
+      seg('sort', [['pos', '시간표순'], ['desc', '점수 높은 순'], ['asc', '점수 낮은 순']]) +
+      '<div class="legend" id="cr-legend" style="margin:0"></div></div>');
     h += '<div class="card"><div class="card-h"><div><h3>과목별 상세</h3><div class="d">시간표 순서 · 열 제목을 누르면 정렬</div></div></div><div class="tbl-wrap"><table id="crs-tbl"><thead><tr>' +
       '<th data-sort="pos">일자</th><th>시간</th><th data-sort="title">과목</th><th>강사</th><th class="num" data-sort="n">응답</th>' +
       S.itemKeys.map(function (k, i) { return '<th class="num" data-sort="m' + i + '">' + esc(k) + ' 평균</th><th class="num" data-sort="t' + i + '">' + esc(k) + ' 만족</th>'; }).join('') +
@@ -529,12 +580,16 @@
 
     var sel = document.getElementById('cohort'); if (sel) sel.onchange = function () { cohort = sel.value; render(); };
     document.getElementById('reload').onclick = function () { openSurvey(CUR, 'dash'); };
-    document.getElementById('print').onclick = function () { window.print(); };
+    document.getElementById('print').onclick = function () { openReport(S); };
     document.getElementById('xlsx').onclick = function () { exportXlsx(S); };
     body.querySelectorAll('[data-png]').forEach(function (b) { b.onclick = function () { savePng(b.dataset.png, b.dataset.name); }; });
 
     if (S.overall.length) { drawOverall(S); drawMinis(S); }
-    if (S.courses.length) { drawCourses(S); fillCourseTable(S, 'pos', 1); }
+    if (S.courses.length) {
+      if (CRV.metric !== 'both' && !S.itemKeys[+CRV.metric]) CRV.metric = 'both';
+      drawCourses(S); fillCourseTable(S, 'pos', 1);
+      body.querySelectorAll('[data-crv]').forEach(function (b) { b.onclick = function () { var p = b.dataset.crv.split(':'); CRV[p[0]] = p[1]; drawCourses(S); }; });
+    }
     drawDemo(S);
     body.querySelectorAll('#crs-tbl [data-sort]').forEach(function (th) {
       th.style.cursor = 'pointer';
@@ -595,21 +650,50 @@
     });
   }
 
-  function drawCourses(S) {
-    charts.push(new Chart(document.getElementById('c-cr'), {
+  /** 보기 방식(view)에 맞춘 과목 목록·지표 (대시보드와 보고서 공용) */
+  function courseView(S, view) {
+    var keys = view.metric === 'both' ? S.itemKeys.slice() : [S.itemKeys[+view.metric]];
+    var score = function (c) { return keys.reduce(function (a, k) { return a + c.by[k].mean; }, 0) / keys.length; };
+    var rows = S.courses.slice();
+    if (view.sort === 'pos') rows.sort(function (a, b) { return a.pos - b.pos; });
+    else rows.sort(function (a, b) { return (view.sort === 'desc' ? score(b) - score(a) : score(a) - score(b)) || a.pos - b.pos; });
+    // 순위는 높은 점수 = 1위 (동점은 같은 순위)
+    var desc = S.courses.map(score).sort(function (a, b) { return b - a; });
+    var rank = function (c) { var s = score(c); return desc.findIndex(function (x) { return Math.abs(x - s) < 1e-9; }) + 1; };
+    return { keys: keys, rows: rows, rank: rank, score: score, perRow: keys.length > 1 ? 42 : 30 };
+  }
+
+  function courseChartConfig(S, view, fixed) {
+    var v = courseView(S, view);
+    var labels = v.rows.map(function (c) { return (view.sort !== 'pos' ? v.rank(c) + '위  ' : '') + courseLabel(c) + (c.split ? ' ·분반' : ''); });
+    return {
       type: 'bar',
-      data: { labels: S.courses.map(function (c) { return courseLabel(c) + (c.split ? ' ·분반' : ''); }), datasets: S.itemKeys.map(function (k, i) {
-        return { label: k, data: S.courses.map(function (c) { return +c.by[k].mean.toFixed(2); }), _n: S.courses.map(function (c) { return c.by[k].n; }),
-          backgroundColor: SERIES[i], borderRadius: 4, borderSkipped: 'start', borderColor: '#fff', borderWidth: { top: 1, bottom: 1 }, barPercentage: .82, categoryPercentage: .78 };
+      data: { labels: labels, datasets: v.keys.map(function (k) {
+        var ci = S.itemKeys.indexOf(k);
+        return { label: k, data: v.rows.map(function (c) { return +c.by[k].mean.toFixed(2); }), _n: v.rows.map(function (c) { return c.by[k].n; }),
+          backgroundColor: SERIES[ci], borderRadius: 4, borderSkipped: 'start', borderColor: '#fff', borderWidth: { top: 1, bottom: 1 },
+          barPercentage: v.keys.length > 1 ? .82 : .7, categoryPercentage: v.keys.length > 1 ? .78 : .9 };
       }) },
       options: {
-        indexAxis: 'y', maintainAspectRatio: false,
-        layout: { padding: { right: 36 } },
+        indexAxis: 'y', maintainAspectRatio: false, responsive: !fixed, animation: fixed ? false : undefined, devicePixelRatio: fixed ? 2 : undefined,
+        layout: { padding: { right: 8 } },
         scales: { x: { min: 1, max: 5, ticks: { stepSize: 1 }, title: { display: true, text: '평균 점수 (1~5)' }, grid: { color: '#e1e0d9' } }, y: { grid: { display: false }, ticks: { color: '#0b0b0b' } } },
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return ' ' + c.dataset.label + ': ' + c.parsed.x.toFixed(2) + '점 (' + c.dataset._n[c.dataIndex] + '명)'; } } } }
+        plugins: { legend: { display: false }, tooltip: { enabled: !fixed, callbacks: { label: function (c) { return ' ' + c.dataset.label + ': ' + c.parsed.x.toFixed(2) + '점 (' + c.dataset._n[c.dataIndex] + '명)'; } } } }
       },
-      plugins: [whiteBg, endLabels]
-    }));
+      plugins: [whiteBg, endLabels],
+      _height: 60 + v.rows.length * v.perRow
+    };
+  }
+
+  function drawCourses(S) {
+    var old = charts.filter(function (c) { return c.canvas.id === 'c-cr'; })[0];
+    if (old) { old.destroy(); charts = charts.filter(function (c) { return c !== old; }); }
+    var cfg = courseChartConfig(S, CRV, false);
+    var box = document.getElementById('c-cr').parentNode; box.style.height = cfg._height + 'px';
+    charts.push(new Chart(document.getElementById('c-cr'), cfg));
+    var lg = document.getElementById('cr-legend');
+    if (lg) lg.innerHTML = legendHTML(courseView(S, CRV).keys.map(function (k) { return [k, SERIES[S.itemKeys.indexOf(k)]]; })).replace(/^<div class="legend">|<\/div>$/g, '');
+    document.querySelectorAll('[data-crv]').forEach(function (b) { var p = b.dataset.crv.split(':'); b.classList.toggle('on', String(CRV[p[0]]) === p[1]); });
   }
 
   function drawDemo(S) {
@@ -636,6 +720,106 @@
     document.body.appendChild(a); a.click(); a.remove();
   }
   window.addEventListener('beforeprint', function () { charts.forEach(function (c) { c.resize(); }); });
+
+  /* ───── 보고서 (PDF) ─────
+   * 화면을 그대로 찍지 않고, A4 폭(본문 690px)에 맞춰 차트를 새로 그려 이미지로 고정한다 → 잘리거나 넘치지 않음.
+   * 미리보기 → [PDF로 저장 / 인쇄] → 인쇄 창에서 "PDF로 저장" */
+  var RP_W = 690;
+
+  function chartImg(cfg, w, h) {
+    var holder = document.createElement('div');
+    holder.style.cssText = 'position:fixed;left:-10000px;top:0;width:' + w + 'px;height:' + h + 'px';
+    var cv = document.createElement('canvas'); cv.width = w; cv.height = h; holder.appendChild(cv); document.body.appendChild(holder);
+    cfg.options = cfg.options || {};
+    cfg.options.responsive = false; cfg.options.maintainAspectRatio = false; cfg.options.animation = false; cfg.options.devicePixelRatio = 2;
+    var ch = new Chart(cv, cfg), url = ch.toBase64Image('image/png', 1);
+    ch.destroy(); holder.remove();
+    return url;
+  }
+
+  function rpFig(url, caption) { return '<div class="rp-fig"><img src="' + url + '" alt="' + esc(caption || '') + '">' + (caption ? '<div class="rp-cap">' + esc(caption) + '</div>' : '') + '</div>'; }
+  function rpTable(head, rows, numCols) {
+    numCols = numCols || [];
+    // 16줄 이하의 짧은 표는 쪽이 바뀌는 곳에서 갈라지지 않게 통째로 다음 쪽으로 넘긴다
+    return (rows.length <= 16 ? '<div class="rp-keep">' : '<div>') + '<table class="rp-tbl"><thead><tr>' + head.map(function (h, i) { return '<th' + (numCols.indexOf(i) >= 0 ? ' class="num"' : '') + '>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      rows.map(function (r) { return '<tr>' + r.map(function (v, i) { return '<td' + (numCols.indexOf(i) >= 0 ? ' class="num"' : '') + '>' + esc(v) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>';
+  }
+
+  function openReport(S) {
+    var c = D.config, today = new Date();
+    var ymd = today.getFullYear() + '. ' + (today.getMonth() + 1) + '. ' + today.getDate() + '.';
+    var allOv = summarize([0, 1, 2, 3, 4].map(function (i) { return S.overall.reduce(function (a, o) { return a + o.counts[i]; }, 0); }));
+    var agg = S.itemKeys.map(function (k) { return { k: k, s: summarize([0, 1, 2, 3, 4].map(function (i) { return S.courses.reduce(function (a, x) { return a + x.by[k].counts[i]; }, 0); })) }; });
+    var h = '<header class="rp-head"><div class="rp-kicker">' + esc([c.course, cohort].filter(Boolean).join(' ')) + ' 사후설문 결과 보고</div>' +
+      '<h1>' + esc(c.title) + '</h1><div class="rp-meta">' + [c.period ? '연수 기간 ' + esc(c.period) : '', '응답자 ' + S.n + '명', '작성일 ' + ymd].filter(Boolean).join(' · ') + '</div></header>';
+
+    // 요약
+    var sum = [];
+    if (S.overall.length) {
+      sum.push([S.overall[0].item, f2(S.overall[0].mean), pct(S.overall[0].top2)]);
+      sum.push([txt(c, 'overallTitle') + ' 평균 (' + S.overall.length + '개 지표)', f2(allOv.mean), pct(allOv.top2)]);
+    }
+    agg.forEach(function (a) { sum.push(['과목 ' + a.k + ' 평균 (' + S.courses.length + '개 과목)', f2(a.s.mean), pct(a.s.top2)]); });
+    if (sum.length) h += '<section><h2>요약</h2>' + rpTable(['구분', '평균 (5점 만점)', '만족 비율 (4~5점)'], sum, [1, 2]) + '</section>';
+
+    // 과정 만족도
+    if (S.overall.length) {
+      var ovCfg = {
+        type: 'bar',
+        data: { labels: S.overall.map(function (o) { return o.item + ' (' + f2(o.mean) + ')'; }), datasets: [0, 1, 2, 3, 4].map(function (i) {
+          return { label: (i + 1) + '점', data: S.overall.map(function (o) { return o.n ? o.counts[i] / o.n * 100 : 0; }), backgroundColor: LIK[i], borderColor: '#fff', borderWidth: { left: 1, right: 1 }, borderSkipped: false, barPercentage: .78, categoryPercentage: .9 };
+        }) },
+        options: { indexAxis: 'y', scales: { x: { stacked: true, max: 100, ticks: { callback: function (v) { return v + '%'; } }, grid: { color: '#e1e0d9' } }, y: { stacked: true, grid: { display: false }, ticks: { color: '#0b0b0b' } } },
+          plugins: { legend: { display: true, position: 'top', align: 'start', labels: { boxWidth: 10, boxHeight: 10, font: { size: 11 }, generateLabels: function () { return [0, 1, 2, 3, 4].map(function (i) { return { text: (i + 1) + '점 ' + (S.lblOverall[i] || ''), fillStyle: LIK[i], strokeStyle: LIK[i], lineWidth: 0 }; }); } } }, tooltip: { enabled: false } } },
+        plugins: [whiteBg]
+      };
+      h += '<section><h2>' + esc(txt(c, 'overallTitle')) + '</h2>' +
+        rpFig(chartImg(ovCfg, RP_W, 70 + S.overall.length * 34), '지표별 응답 분포 (막대 길이 = 응답 비율, 괄호 = 평균)') +
+        rpTable(['지표', '평균', '만족 비율', '응답'].concat([5, 4, 3, 2, 1].map(function (v) { return v + '점'; })),
+          S.overall.map(function (o) { return [o.item, f2(o.mean), pct(o.top2), o.n].concat([4, 3, 2, 1, 0].map(function (i) { return o.counts[i]; })); }),
+          [1, 2, 3, 4, 5, 6, 7, 8]) + '</section>';
+    }
+
+    // 과목 평가: 지표별 점수 순위 + 시간표순 상세
+    if (S.courses.length) {
+      h += '<section><h2>' + esc(txt(c, 'slotsTitle')) + '</h2>';
+      S.itemKeys.forEach(function (k, i) {
+        var cfg = courseChartConfig(S, { metric: String(i), sort: 'desc' }, true);
+        h += '<h3>' + esc(k) + ' 점수 순위</h3>' + rpFig(chartImg(cfg, RP_W, cfg._height), k + ' 평균 점수가 높은 순 (1~5점)');
+      });
+      h += '<h3>과목별 상세 (시간표순)</h3>' + rpTable(['일자', '시간', '과목', '강사', '응답'].concat([].concat.apply([], S.itemKeys.map(function (k) { return [k + ' 평균', k + ' 만족']; }))),
+        S.courses.slice().sort(function (a, b) { return a.pos - b.pos; }).map(function (x) {
+          return [x.date, x.time, x.title + (x.split ? ' (분반)' : ''), x.inst, x.n].concat([].concat.apply([], S.itemKeys.map(function (k) { return [f2(x.by[k].mean), pct(x.by[k].top2)]; })));
+        }), [4, 5, 6, 7, 8]) + '</section>';
+    }
+
+    // 응답자 구성: 항목별 작은 표
+    if (S.demo.length) {
+      h += '<section><h2>응답자 구성</h2><div class="rp-demo">' + S.demo.map(function (d) {
+        var tot = d.entries.reduce(function (a, e) { return a + e[1]; }, 0);
+        return '<div class="rp-demo-i"><h4>' + esc(d.label) + '</h4>' + rpTable(['구분', '명', '비율'], d.entries.map(function (e) { return [e[0], e[1], (e[1] / tot * 100).toFixed(1) + '%']; }), [1, 2]) + '</div>';
+      }).join('') + '</div></section>';
+    }
+
+    // 서술형 의견
+    if (S.open.length) {
+      h += '<section><h2>' + esc(txt(c, 'openTitle')) + '</h2>' + S.open.map(function (q) {
+        return '<h3>' + esc(q.q) + ' <span class="rp-cnt">' + q.answers.length + '건' + (q.skipped ? ' · "없음" 등 ' + q.skipped + '건 제외' : '') + '</span></h3>' +
+          (q.answers.length ? '<ol class="rp-open">' + q.answers.map(function (a) { return '<li>' + esc(a.text) + '</li>'; }).join('') + '</ol>' : '<p class="rp-cnt">응답 없음</p>');
+      }).join('') + '</section>';
+    }
+
+    var wrap = document.createElement('div');
+    wrap.id = 'report-wrap';
+    wrap.innerHTML = '<div class="rp-bar"><b>보고서 미리보기</b><span class="rp-tip">[PDF로 저장 / 인쇄] → 인쇄 창의 <b>대상</b>에서 "PDF로 저장"을 고르세요.</span>' +
+      '<button class="btn primary" id="rp-print">PDF로 저장 / 인쇄</button><button class="btn" id="rp-close">닫기</button></div><div id="report">' + h + '</div>';
+    document.body.appendChild(wrap);
+    document.body.classList.add('reporting');
+    var prevTitle = document.title;
+    document.title = (c.title || '설문 결과') + ' 결과 보고서'; // PDF 저장 시 기본 파일 이름
+    document.getElementById('rp-print').onclick = function () { window.print(); };
+    document.getElementById('rp-close').onclick = function () { wrap.remove(); document.body.classList.remove('reporting'); document.title = prevTitle; };
+  }
 
   /* ───── 엑셀 ───── */
   function exportXlsx(S) {
