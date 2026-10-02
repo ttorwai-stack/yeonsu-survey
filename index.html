@@ -578,7 +578,7 @@
       start();
     });
   }).catch(function (err) {
-    app.innerHTML = '<div class="center"><h2>설문을 불러오지 못했어요</h2><p>' + esc((err && err.message) || err) + '</p></div>';
+    app.innerHTML = '<div class="center"><h2>설문을 불러오지 못했어요</h2><p>' + esc((err && err.message) || err) + '<br>받은 링크 전체가 그대로 열렸는지 확인하고, 잠시 후 다시 열어 주세요.</p></div>';
   });
 
   function start() {
