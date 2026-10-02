@@ -145,7 +145,12 @@
 
   /* ───── 서버 호출 (Apps Script / 로컬 미리보기 공통) ───── */
   // 실행 환경: Apps Script 안(gas) / 내 PC 미리보기(mock) / GitHub Pages 등 외부(http)
-  var API_URL = 'https://script.google.com/macros/s/AKfycbyUUAH8jsoHkZlngyhJ6pab1aRJy3X7qi1H0665IOJNG7RxVgA21-v33suYtOqjMyGo3Q/exec';
+  // 데이터 서버 = 각 관리자의 Apps Script 웹앱. 링크의 ?api=배포ID 가 있으면 그 관리자 서버로, 없으면 기본 서버로.
+  // 보안: 구글 Apps Script 배포 ID 형식만 받는다(다른 사이트로는 응답이 가지 않음).
+  var DEFAULT_API_ID = 'AKfycbyUUAH8jsoHkZlngyhJ6pab1aRJy3X7qi1H0665IOJNG7RxVgA21-v33suYtOqjMyGo3Q';
+  function apiIdFrom(v) { var m = String(v || '').trim().match(/(?:^|\/s\/)(AKfyc[\w-]{20,})(?:\/(?:exec|dev))?\/?$/); return m ? m[1] : ''; }  var API_ID = apiIdFrom(new URLSearchParams(location.search).get('api')) || DEFAULT_API_ID;
+  var API_URL = 'https://script.google.com/macros/s/' + API_ID + '/exec';
+  function apiParam() { return API_ID === DEFAULT_API_ID ? '' : 'api=' + API_ID; }
   var MODE = (window.google && google.script && google.script.run) ? 'gas'
     : /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'mock' : 'http';
   var ready = new Promise(function (resolve) {
@@ -554,7 +559,7 @@
       var list = r[0], base = r[1];
       app.innerHTML = '<main><div class="intro"><h2>진행 중인 설문</h2><p>참여할 설문을 선택해 주세요.</p></div>' +
         (list.length ? list.map(function (s) {
-          return '<a class="card pick-survey" href="' + esc(base + '?s=' + encodeURIComponent(s.id)) + '" target="_top"><div class="sess-t">' + esc(s.title) + '</div>' +
+          return '<a class="card pick-survey" href="' + esc(base + '?s=' + encodeURIComponent(s.id) + (MODE === 'http' && apiParam() ? '&' + apiParam() : '')) + '" target="_top"><div class="sess-t">' + esc(s.title) + '</div>' +
             '<div class="sess-i">' + esc([s.course, s.cohort].filter(Boolean).join(' · ')) + '</div></a>';
         }).join('') : '<div class="center"><p>지금 진행 중인 설문이 없어요.</p></div>') + '</main>';
     });

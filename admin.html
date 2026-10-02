@@ -108,6 +108,7 @@
   .login { max-width: 360px; margin: 12vh auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 24px; }
   .login h2 { margin: 0 0 14px; font-size: 19px; }
   .login input { width: 100%; padding: 11px 12px; border: 1px solid var(--axis); border-radius: 9px; margin-bottom: 10px; }
+  .login .srv { margin-top: 14px; font-size: 12.5px; color: var(--ink-3); display: flex; align-items: center; gap: 8px; justify-content: center; }
   .login .err { color: var(--danger); font-size: 13px; min-height: 18px; margin-bottom: 6px; }
   .empty { text-align: center; color: var(--ink-2); padding: 60px 20px; }
 
@@ -149,7 +150,17 @@
 
   /* ───── 서버 호출 ───── */
   // 실행 환경: Apps Script 안(gas) / 내 PC 미리보기(mock) / GitHub Pages 등 외부(http)
-  var API_URL = 'https://script.google.com/macros/s/AKfycbyUUAH8jsoHkZlngyhJ6pab1aRJy3X7qi1H0665IOJNG7RxVgA21-v33suYtOqjMyGo3Q/exec';
+  // 데이터 서버 = 각 관리자의 Apps Script 웹앱. 링크의 ?api=배포ID 가 있으면 그 관리자 서버로, 없으면 기본 서버로.
+  // 보안: 구글 Apps Script 배포 ID 형식만 받는다(다른 사이트로는 응답이 가지 않음).
+  var DEFAULT_API_ID = 'AKfycbyUUAH8jsoHkZlngyhJ6pab1aRJy3X7qi1H0665IOJNG7RxVgA21-v33suYtOqjMyGo3Q';
+  function apiIdFrom(v) { var m = String(v || '').trim().match(/(?:^|\/s\/)(AKfyc[\w-]{20,})(?:\/(?:exec|dev))?\/?$/); return m ? m[1] : ''; }  // 관리자 페이지는 마지막으로 연결한 서버를 이 기기에 기억한다 (?api= 로 처음 한 번 들어오면 됨)
+  var API_ID = (function () {
+    var p = apiIdFrom(new URLSearchParams(location.search).get('api')), s = '';
+    try { s = apiIdFrom(localStorage.getItem('svy-api')); if (p) localStorage.setItem('svy-api', p); } catch (e) { /* 저장 안 돼도 동작 */ }
+    return p || s || DEFAULT_API_ID;
+  })();
+  var API_URL = 'https://script.google.com/macros/s/' + API_ID + '/exec';
+  function apiParam() { return API_ID === DEFAULT_API_ID ? '' : 'api=' + API_ID; }
   var MODE = (window.google && google.script && google.script.run) ? 'gas'
     : /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'mock' : 'http';
   var ready = new Promise(function (resolve) {
@@ -242,7 +253,17 @@
   /* ───── 로그인 ───── */
   function showLogin(msg) {
     root.innerHTML = '<form class="login" id="lf"><h2>설문 관리 · 관리자</h2><input type="password" id="pw" placeholder="관리자 비밀번호" autocomplete="current-password" autofocus>' +
-      '<div class="err">' + esc(msg || '') + '</div><button class="btn primary" style="width:100%;padding:11px">들어가기</button></form>';
+      '<div class="err">' + esc(msg || '') + '</div><button class="btn primary" style="width:100%;padding:11px">들어가기</button>' +
+      (MODE === 'http' ? '<div class="srv">연결된 서버: …' + esc(API_ID.slice(-8)) + (API_ID === DEFAULT_API_ID ? ' (기본)' : '') + ' <button type="button" class="btn sm" id="chg-api">서버 변경</button></div>' : '') + '</form>';
+    var chg = document.getElementById('chg-api');
+    if (chg) chg.onclick = function () {
+      var v = prompt('내 웹앱 주소를 붙여넣으세요.\n(시트 메뉴 [설문 도구 → 웹앱 주소 보기]에 나와요. 비워 두면 기본 서버)', 'https://script.google.com/macros/s/' + API_ID + '/exec');
+      if (v === null) return;
+      var id = v.trim() ? apiIdFrom(v) : DEFAULT_API_ID;
+      if (!id) return toast('웹앱 주소 형식이 아니에요. .../macros/s/.../exec 주소를 넣어 주세요.');
+      try { localStorage.setItem('svy-api', id); sessionStorage.removeItem('svy-admin'); } catch (e) { /* 무시 */ }
+      location.href = location.href.split('?')[0] + (id === DEFAULT_API_ID ? '' : '?api=' + id);
+    };
     document.getElementById('lf').onsubmit = function (e) {
       e.preventDefault();
       var k = document.getElementById('pw').value;
@@ -251,7 +272,8 @@
   }
 
   /* ───── 설문 목록 ───── */
-  function surveyUrl(id) { return APPURL + '?s=' + encodeURIComponent(id); }
+  // 응답 링크: GitHub 화면이면 이 관리자의 서버(api)도 링크에 담는다
+  function surveyUrl(id) { return APPURL + '?s=' + encodeURIComponent(id) + (MODE === 'http' && apiParam() ? '&' + apiParam() : ''); }
 
   function loadList() {
     charts.forEach(function (c) { c.destroy(); }); charts = [];
