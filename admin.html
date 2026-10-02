@@ -183,7 +183,8 @@
     };
     // 30초 넘게 답이 없으면 끊고 다시 시도 (제출도 응답ID가 같아 서버에서 하나만 저장됨)
     var ctl = window.AbortController ? new AbortController() : null;
-    var timer = ctl ? setTimeout(function () { ctl.abort(); }, 30000) : null;
+    var limit = /^(getResults|listSurveys|createSurvey|saveConfig)$/.test(name) ? 90000 : 30000; // 무거운 관리자 요청은 넉넉히
+    var timer = ctl ? setTimeout(function () { ctl.abort(); }, limit) : null;
     return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: name, args: args }), signal: ctl ? ctl.signal : undefined })
       .then(function (r) {
         clearTimeout(timer);
@@ -267,7 +268,7 @@
     document.getElementById('lf').onsubmit = function (e) {
       e.preventDefault();
       var k = document.getElementById('pw').value;
-      api('verifyKey', k).then(function (ok) { if (!ok) return showLogin('비밀번호가 맞지 않아요.'); KEY = k; ss('svy-admin', k); loadList(); }).catch(function (er) { showLogin(errMsg(er)); });
+      KEY = k; loadList(); // 목록 요청이 곧 비밀번호 확인 (서버 왕복 한 번)
     };
   }
 
@@ -278,11 +279,20 @@
   function loadList() {
     charts.forEach(function (c) { c.destroy(); }); charts = [];
     CUR = null; D = null;
-    root.innerHTML = '<div class="empty">설문 목록을 불러오는 중…</div>';
+    loading('설문 목록을 불러오는 중');
     Promise.all([api('listSurveys', KEY), APPURL ? APPURL : api('getAppUrl').catch(function () { return ''; })]).then(function (r) {
-      SURVEYS = r[0]; APPURL = r[1] || APPURL;
-      renderList();
-    }).catch(function (e) { KEY = ''; ss('svy-admin', ''); showLogin(errMsg(e)); });
+      SURVEYS = r[0]; APPURL = r[1] || APPURL; ss('svy-admin', KEY);
+      loading(null); renderList();
+    }).catch(function (e) { loading(null); KEY = ''; ss('svy-admin', ''); showLogin(errMsg(e)); });
+  }
+
+  // 불러오는 동안 몇 초째인지 보여 준다 (구글 서버가 깨어나거나 제출이 몰릴 때 몇 초 걸릴 수 있음)
+  function loading(msg) {
+    clearInterval(loading._t);
+    if (!msg) return;
+    var s = 0;
+    root.innerHTML = '<div class="empty"><span id="ld">' + esc(msg) + '…</span></div>';
+    loading._t = setInterval(function () { s++; var el = document.getElementById('ld'); if (!el) return clearInterval(loading._t); el.textContent = msg + '… ' + s + '초' + (s >= 8 ? ' (응답이 많거나 서버가 깨어나는 중이에요)' : ''); }, 1000);
   }
 
   function statusBadge(st) { return '<span class="st ' + (st === OPEN ? 'open' : 'closed') + '">' + esc(st) + '</span>'; }
@@ -346,13 +356,14 @@
   function openSurvey(id, which) {
     charts.forEach(function (c) { c.destroy(); }); charts = [];
     CUR = id; tab = which || 'dash'; cohort = null;
-    root.innerHTML = '<div class="empty">불러오는 중…</div>';
+    loading('결과를 불러오는 중');
     api('getResults', KEY, id).then(function (d) {
+      loading(null);
       D = d;
       var cs = cohorts();
       cohort = cs.indexOf(D.config.cohort) >= 0 ? D.config.cohort : cs[cs.length - 1] || D.config.cohort;
       render();
-    }).catch(function (e) { toast(errMsg(e)); loadList(); });
+    }).catch(function (e) { loading(null); toast(errMsg(e)); loadList(); });
   }
 
   /* ───── 데이터 가공 ───── */
@@ -850,7 +861,7 @@
 
   /* ───── 시작 ───── */
   KEY = ss('svy-admin') || '';
-  if (KEY) api('verifyKey', KEY).then(function (ok) { if (ok) loadList(); else showLogin(); }).catch(function () { showLogin(); });
+  if (KEY) loadList();
   else showLogin();
 })();
 </script>
