@@ -270,8 +270,8 @@
   /* ───── 렌더링 ───── */
   // 왼쪽이 5점(매우 그렇다), 오른쪽이 1점(전혀 아니다). 저장 값은 그대로 1~5.
   // 라벨은 다섯 개 모두 같은 굵기·색으로 (특정 선택지를 강조하면 응답이 쏠릴 수 있음)
-  function scaleHTML(name, labels, val, disabled) {
-    var h = '<div class="scale' + (disabled ? ' disabled' : '') + '" role="radiogroup">';
+  function scaleHTML(name, labels, val, disabled, unit) {
+    var h = '<div' + (unit ? ' data-unit' : '') + ' class="scale' + (disabled ? ' disabled' : '') + '" role="radiogroup">';
     for (var v = 5; v >= 1; v--) {
       h += '<label class="opt"><input type="radio" name="' + esc(name) + '" value="' + v + '" aria-label="' + esc(labels[v - 1]) + '"' + (val === v ? ' checked' : '') + (disabled ? ' disabled' : '') + '>' +
         '<span><span class="lbl">' + esc(labels[v - 1]) + '</span><span class="dot"></span></span></label>';
@@ -320,7 +320,7 @@
     var h = secHead('demoTitle', 'demoDesc') + '<div class="card">';
     cfg.demographics.forEach(function (d, i) {
       var v = A.demo[d.id];
-      h += '<div class="q" id="d-' + esc(d.id) + '"><div class="qt"><span class="n">' + (i + 1) + '.</span>' + esc(d.label) + '<span class="req">*</span></div><div class="chips">' +
+      h += '<div class="q" data-unit id="d-' + esc(d.id) + '"><div class="qt"><span class="n">' + (i + 1) + '.</span>' + esc(d.label) + '<span class="req">*</span></div><div class="chips">' +
         d.options.map(function (o) {
           return '<label class="chip"><input type="radio" name="demo:' + esc(d.id) + '" value="' + esc(o) + '"' + (v === o ? ' checked' : '') + '><span>' + esc(o) + '</span></label>';
         }).join('') +
@@ -336,7 +336,7 @@
     var labels = cfg.scales[cfg.overall.scale];
     var h = secHead('overallTitle', 'overallDesc') + '<div class="card">';
     cfg.overall.items.forEach(function (it, i) {
-      h += '<div class="q" id="o-' + i + '"><div class="qt"><span class="n">' + (i + 1) + '.</span>' + esc(it.text) + '<span class="req">*</span></div>' +
+      h += '<div class="q" data-unit id="o-' + i + '"><div class="qt"><span class="n">' + (i + 1) + '.</span>' + esc(it.text) + '<span class="req">*</span></div>' +
         scaleHTML('ov:' + i, labels, A.overall[i]) + '<div class="warn">응답해 주세요.</div></div>';
     });
     return h + '</div>';
@@ -352,13 +352,13 @@
     }
     h += '</div><span class="done-mark" aria-hidden="true"></span></div>';
     if (split) {
-      h += '<p class="pick-hint">' + esc(T('splitHint')) + ' <span class="req">*</span></p><div class="pick">' + s.options.map(function (op, i) {
+      h += '<p class="pick-hint">' + esc(T('splitHint')) + ' <span class="req">*</span></p><div class="pick" data-unit>' + s.options.map(function (op, i) {
         return '<label class="chip"><input type="radio" name="pick:' + esc(s.id) + '" value="' + i + '"' + (a.choice === i ? ' checked' : '') + '><span>' + esc(op.title) + '<small>' + esc(op.instructor) + '</small></span></label>';
       }).join('') + '</div>';
     }
     cfg.sessionItems.forEach(function (it) {
       h += '<div class="sq"><em>' + esc(it.key) + '</em>' + esc(it.text) + '</div>' +
-        scaleHTML('sl:' + s.id + ':' + it.key, cfg.scales[it.scale], a.scores[it.key], a.choice == null);
+        scaleHTML('sl:' + s.id + ':' + it.key, cfg.scales[it.scale], a.scores[it.key], a.choice == null, true);
     });
     return h + '<div class="warn">' + (split ? '분반을 선택하고 ' : '') + '모든 문항에 응답해 주세요.</div></div>';
   }
@@ -388,10 +388,14 @@
   /* ───── 이벤트 ───── */
   app.addEventListener('change', function (e) {
     var t = e.target, n = t.name || '', p = n.split(':');
+    var from = t.closest('[data-unit]'); // 방금 답한 문항 (다음 문항으로 자동 스크롤할 기준)
     if (p[0] === 'demo') {
       A.demo[p[1]] = t.value;
       var d = cfg.demographics.filter(function (x) { return x.id === p[1]; })[0];
-      if (d && d.other) { render(); if (t.value === '__other') { var oi = app.querySelector('[data-other="' + p[1] + '"]'); if (oi) oi.focus(); } }
+      if (d && d.other) {
+        render(); from = document.getElementById('d-' + p[1]);
+        if (t.value === '__other') { var oi = app.querySelector('[data-other="' + p[1] + '"]'); if (oi) oi.focus(); from = null; } // 기타 입력 중에는 이동하지 않음
+      }
     } else if (p[0] === 'ov') {
       A.overall[+p[1]] = +t.value;
     } else if (p[0] === 'pick') {
@@ -400,12 +404,39 @@
       var tmp = document.createElement('div'); tmp.innerHTML = slotCard(cfg.slots.filter(function (s) { return s.id === p[1]; })[0]);
       card.replaceWith(tmp.firstChild);
       var first = document.querySelector('#s-' + CSS.escape(p[1]) + ' .scale input'); if (first) first.focus({ preventScroll: true });
+      from = document.querySelector('#s-' + CSS.escape(p[1]) + ' .pick');
     } else if (p[0] === 'sl') {
       A.slots[p[1]].scores[p.slice(2).join(':')] = +t.value;
     }
     clearMissing(t);
     saveDraft(); updateProgress();
+    if (from) autoAdvance(from);
   });
+
+  // 답한 문항 다음의 '아직 안 한' 문항이 화면 아래(또는 하단 버튼 뒤)에 가려 있으면 위쪽으로 부드럽게 올려 준다.
+  // 이미 잘 보이는 위치면 움직이지 않는다.
+  function autoAdvance(from) {
+    var units = Array.prototype.slice.call(app.querySelectorAll('[data-unit]'));
+    var i = units.indexOf(from), next = null;
+    if (i < 0) return;
+    for (var k = i + 1; k < units.length; k++) {
+      var u = units[k];
+      if (u.querySelector('input:disabled')) continue;
+      if (!u.querySelector('input:checked')) { next = u; break; }
+    }
+    if (!next) return;
+    clearTimeout(autoAdvance._t);
+    autoAdvance._t = setTimeout(function () {
+      if (!document.body.contains(next)) return;
+      var top = (document.querySelector('.top') || {}).offsetHeight || 0;
+      var bottom = window.innerHeight - ((document.querySelector('.nav') || {}).offsetHeight || 0);
+      var r = next.getBoundingClientRect();
+      if (r.top >= top + 8 && r.bottom <= bottom - 8) return; // 이미 다 보임
+      var target = top + Math.max(12, (bottom - top - r.height) * 0.25); // 남은 공간의 위쪽 1/4 지점에 오도록
+      var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollBy({ top: r.top - target, behavior: reduce ? 'auto' : 'smooth' });
+    }, 220);
+  }
   app.addEventListener('input', function (e) {
     var t = e.target;
     if (t.dataset.other) { A.other[t.dataset.other] = t.value; clearMissing(t); }
