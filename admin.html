@@ -162,6 +162,23 @@
   .rp-cnt { font-weight: 400; color: #666; font-size: 11.5px; }
   .rp-open { margin: 4px 0 10px; padding-left: 20px; }
   .rp-open li { margin: 0 0 5px; white-space: pre-wrap; break-inside: avoid; page-break-inside: avoid; }
+  /* 설문지 (종이 양식) */
+  .rp-chk { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer; }
+  .rp-newpage { break-before: page; page-break-before: always; margin-top: 40px; padding-top: 24px; border-top: 2px dashed #bbb; }
+  .rp-appx-label { font-size: 12px; font-weight: 700; color: #666; letter-spacing: .1em; }
+  .qf-intro { white-space: pre-line; margin: 10px 0; }
+  .qf-desc { color: #555; margin: 0 0 8px; font-size: 12px; }
+  .qf-q { margin: 0 0 12px; break-inside: avoid; page-break-inside: avoid; }
+  .qf-qt { font-weight: 700; margin-bottom: 4px; }
+  .qf-opts { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+  .qf-blank { display: inline-block; width: 120px; border-bottom: 1px solid #333; margin: 0 4px; vertical-align: -2px; }
+  .qf-tbl .qf-c { text-align: center; width: 54px; font-size: 10.5px; }
+  .qf-tbl td.qf-c { font-size: 15px; color: #444; }
+  .qf-tbl .qf-split td { background: #fbf8ef; }
+  .qf-tag { display: inline-block; font-size: 10px; font-weight: 700; color: #7a4a00; border: 1px solid #d9b86b; border-radius: 4px; padding: 0 4px; }
+  .qf-inst { color: #555; }
+  .qf-lines div { height: 26px; border-bottom: 1px solid #999; }
+  .qf-end { margin-top: 24px; text-align: center; color: #555; }
 
   @media print {
     @page { size: A4; margin: 12mm; }
@@ -169,6 +186,7 @@
     body.reporting #report-wrap { position: static; overflow: visible; background: #fff; }
     body.reporting .rp-bar { display: none !important; }
     body.reporting #report { width: auto; max-width: none; margin: 0; padding: 0; box-shadow: none; }
+    body.reporting .rp-newpage { margin-top: 0; padding-top: 0; border-top: 0; }
     body { background: #fff; font-size: 12px; }
     header.top, .toolbar .btn, .toolbar select, .card-h .act, .no-print { display: none !important; }
     .card, .kpi { border-color: #ddd; }
@@ -531,7 +549,7 @@
 
     var h = '<div class="toolbar"><div class="grow"><h2>' + esc(cohort) + ' 결과</h2><div class="sub">응답 ' + S.n + '명 · 점수는 5점 만점 평균, 만족 비율은 4~5점 응답 비율</div></div>' +
       (cs.length > 1 ? '<select id="cohort" aria-label="기수 선택">' + cs.map(function (c) { return '<option' + (c === cohort ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>' : '') +
-      '<button class="btn" id="reload">새로고침</button><button class="btn" id="print">보고서 PDF</button><button class="btn primary" id="xlsx">엑셀 다운로드</button></div>';
+      '<button class="btn" id="reload">새로고침</button><button class="btn" id="qform">설문지 PDF</button><button class="btn" id="print">보고서 PDF</button><button class="btn primary" id="xlsx">엑셀 다운로드</button></div>';
 
     h += '<div class="kpis">' +
       kpi('응답자', S.n, '명', '') +
@@ -581,6 +599,7 @@
     var sel = document.getElementById('cohort'); if (sel) sel.onchange = function () { cohort = sel.value; render(); };
     document.getElementById('reload').onclick = function () { openSurvey(CUR, 'dash'); };
     document.getElementById('print').onclick = function () { openReport(S); };
+    document.getElementById('qform').onclick = openQuestionnaire;
     document.getElementById('xlsx').onclick = function () { exportXlsx(S); };
     body.querySelectorAll('[data-png]').forEach(function (b) { b.onclick = function () { savePng(b.dataset.png, b.dataset.name); }; });
 
@@ -809,14 +828,86 @@
       }).join('') + '</section>';
     }
 
+    showPreview('보고서 미리보기', h, (c.title || '설문 결과') + ' 결과 보고서', true);
+  }
+
+  /* ───── 설문지 (종이 양식) ─────
+   * 현재 설정 그대로: 안내 문구, 기본 정보(☐), 척도표(응답 화면처럼 5점이 왼쪽), 시간표(분반은 택 1), 서술형 적는 칸 */
+  function questionnaireHTML(c) {
+    c.demographics = c.demographics || []; c.slots = c.slots || []; c.open = c.open || []; c.sessionItems = c.sessionItems || [];
+    var ov = (c.overall && c.overall.items) || [];
+    var labels = function (key) { return (c.scales[key] || []).slice().reverse(); }; // 5점 → 1점
+    var circles = function (n) { var s = ''; for (var i = 0; i < n; i++) s += '<td class="qf-c">○</td>'; return s; };
+    var sec = 0, q = 0;
+    var head = function (tk, dk) { var d = txt(c, dk); return '<h2>' + (++sec) + '. ' + esc(txt(c, tk)) + '</h2>' + (d ? '<p class="qf-desc">' + esc(d) + '</p>' : ''); };
+    var h = '<header class="rp-head"><div class="rp-kicker">설문지</div><h1>' + esc(c.title) + '</h1>' +
+      (c.period ? '<div class="rp-meta">연수 기간 ' + esc(c.period) + '</div>' : '') + '</header>';
+    if (c.intro) h += '<p class="qf-intro">' + esc(c.intro) + '</p>';
+    h += '<p class="qf-desc">* 표시는 필수 응답입니다. 척도 문항은 해당하는 칸 하나에 ✔ 표시해 주세요.</p>';
+
+    if (c.demographics.length) {
+      h += '<section>' + head('demoTitle', 'demoDesc') + c.demographics.map(function (d) {
+        return '<div class="qf-q"><div class="qf-qt">' + (++q) + '. ' + esc(d.label) + ' *</div><div class="qf-opts">' +
+          d.options.map(function (o) { return '<span>☐ ' + esc(o) + '</span>'; }).join('') +
+          (d.other ? '<span>☐ 기타 (<span class="qf-blank"></span>)</span>' : '') + '</div></div>';
+      }).join('') + '</section>';
+    }
+
+    if (ov.length) {
+      var la = labels(c.overall.scale);
+      h += '<section>' + head('overallTitle', 'overallDesc') +
+        '<table class="rp-tbl qf-tbl"><thead><tr><th>문항</th>' + la.map(function (l) { return '<th class="qf-c">' + esc(l) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        ov.map(function (it) { return '<tr><td>' + (++q) + '. ' + esc(it.text) + ' *</td>' + circles(la.length) + '</tr>'; }).join('') + '</tbody></table></section>';
+    }
+
+    if (c.slots.length) {
+      h += '<section>' + head('slotsTitle', 'slotsDesc');
+      if (c.slots.some(function (s) { return s.options.length > 1; })) h += '<p class="qf-desc">「분반 · 택 1」 수업은 ' + esc(txt(c, 'splitHint')) + '. 들은 수업 한 줄에만 응답해 주세요.</p>';
+      c.sessionItems.forEach(function (it) {
+        var lb = labels(it.scale);
+        h += '<h3>' + (++q) + '. [' + esc(it.key) + '] ' + esc(it.text) + ' *</h3>' +
+          '<table class="rp-tbl qf-tbl"><thead><tr><th style="width:70px">일자</th><th style="width:38px">시간</th><th>과목 · 강사</th>' + lb.map(function (l) { return '<th class="qf-c">' + esc(l) + '</th>'; }).join('') + '</tr></thead><tbody>';
+        c.slots.forEach(function (s) {
+          var split = s.options.length > 1;
+          s.options.forEach(function (o, i) {
+            h += '<tr' + (split ? ' class="qf-split"' : '') + '><td>' + (i === 0 ? esc(s.date) : '') + '</td><td>' + (i === 0 ? esc(s.time) : '') + '</td><td>' +
+              (split ? '<span class="qf-tag">분반 · 택 1</span> ' : '') + esc(o.title) + (o.instructor ? ' <span class="qf-inst">(' + esc(o.instructor) + ')</span>' : '') + '</td>' + circles(lb.length) + '</tr>';
+          });
+        });
+        h += '</tbody></table>';
+      });
+      h += '</section>';
+    }
+
+    if (c.open.length) {
+      h += '<section>' + head('openTitle', 'openDesc') + c.open.map(function (o) {
+        return '<div class="qf-q"><div class="qf-qt">' + (++q) + '. ' + esc(o.text) + (o.required ? ' *' : ' (선택)') + '</div><div class="qf-lines"><div></div><div></div><div></div></div></div>';
+      }).join('') + '</section>';
+    }
+    return h + '<p class="qf-end">' + esc(txt(c, 'doneMsg')) + '</p>';
+  }
+
+  function openQuestionnaire() {
+    var c = D.config;
+    showPreview('설문지 미리보기', questionnaireHTML(JSON.parse(JSON.stringify(c))), (c.title || '설문') + ' 설문지', false);
+  }
+
+  /** 미리보기 화면 (보고서·설문지 공용). withAppendix = 보고서에 「부록: 설문지」 붙이기 선택칸 */
+  function showPreview(label, bodyHtml, docTitle, withAppendix) {
     var wrap = document.createElement('div');
     wrap.id = 'report-wrap';
-    wrap.innerHTML = '<div class="rp-bar"><b>보고서 미리보기</b><span class="rp-tip">[PDF로 저장 / 인쇄] → 인쇄 창의 <b>대상</b>에서 "PDF로 저장"을 고르세요.</span>' +
-      '<button class="btn primary" id="rp-print">PDF로 저장 / 인쇄</button><button class="btn" id="rp-close">닫기</button></div><div id="report">' + h + '</div>';
+    wrap.innerHTML = '<div class="rp-bar"><b>' + esc(label) + '</b><span class="rp-tip">[PDF로 저장 / 인쇄] → 인쇄 창의 <b>대상</b>에서 "PDF로 저장"을 고르세요.</span>' +
+      (withAppendix ? '<label class="rp-chk"><input type="checkbox" id="rp-appx" checked> 설문지 포함 (부록)</label>' : '') +
+      '<button class="btn primary" id="rp-print">PDF로 저장 / 인쇄</button><button class="btn" id="rp-close">닫기</button></div>' +
+      '<div id="report">' + bodyHtml +
+      (withAppendix ? '<div id="rp-appendix" class="rp-newpage"><div class="rp-appx-label">부록</div>' + questionnaireHTML(JSON.parse(JSON.stringify(D.config))) + '</div>' : '') + '</div>';
     document.body.appendChild(wrap);
     document.body.classList.add('reporting');
     var prevTitle = document.title;
-    document.title = (c.title || '설문 결과') + ' 결과 보고서'; // PDF 저장 시 기본 파일 이름
+    document.title = docTitle; // PDF 저장 시 기본 파일 이름
+    var chk = document.getElementById('rp-appx');
+    if (chk) chk.onchange = function () { document.getElementById('rp-appendix').style.display = chk.checked ? '' : 'none'; document.title = docTitle + (chk.checked ? ' (설문지 포함)' : ''); };
+    if (chk) document.title = docTitle + ' (설문지 포함)';
     document.getElementById('rp-print').onclick = function () { window.print(); };
     document.getElementById('rp-close').onclick = function () { wrap.remove(); document.body.classList.remove('reporting'); document.title = prevTitle; };
   }
@@ -892,7 +983,7 @@
     });
     var body = document.getElementById('body');
     body.innerHTML = '<div class="toolbar"><div class="grow"><h2>설문 설정</h2><div class="sub">응답 화면의 모든 문구와 문항을 여기서 정해요. 저장하면 바로 반영돼요. 어떤 단계의 문항을 모두 지우면 그 단계는 설문에서 빠져요.</div></div>' +
-      '<a class="btn" id="preview" target="_blank" rel="noopener">응답 화면 열기</a><button class="btn primary" id="save">저장</button></div>' +
+      '<a class="btn" id="preview" target="_blank" rel="noopener">응답 화면 열기</a><button class="btn" id="qform2" title="저장된 설정 기준">설문지 PDF</button><button class="btn primary" id="save">저장</button></div>' +
 
       stepCard('', '첫 화면', '설문 맨 위에 보이는 제목과 안내', '<div class="form">' +
         field('title', '설문 제목', c.title) + field('course', '과정명', c.course) + field('cohort', '기수', c.cohort) +
@@ -971,6 +1062,7 @@
     body.addEventListener('click', function (e) { if (e.target.classList.contains('x')) e.target.closest('tr').remove(); });
     document.getElementById('preview').href = surveyUrl(CUR);
     document.getElementById('save').onclick = saveCfg;
+    document.getElementById('qform2').onclick = openQuestionnaire;
   }
 
   function field(id, label, val, hint) { return '<label for="f-' + id + '">' + esc(label) + '</label><div><input type="text" id="f-' + id + '" value="' + esc(val || '') + '">' + (hint ? '<div class="hint">' + esc(hint) + '</div>' : '') + '</div>'; }
