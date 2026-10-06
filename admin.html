@@ -563,14 +563,14 @@
     var first = S.overall[0], allOv = summarize([0, 1, 2, 3, 4].map(function (i) { return S.overall.reduce(function (a, o) { return a + o.counts[i]; }, 0); }));
     var itemAgg = S.itemKeys.map(function (k) { return { k: k, s: summarize([0, 1, 2, 3, 4].map(function (i) { return S.courses.reduce(function (a, c) { return a + c.by[k].counts[i]; }, 0); })) }; });
 
-    var h = '<div class="toolbar"><div class="grow"><h2>' + esc(cohort) + ' 결과</h2><div class="sub">응답 ' + S.n + '명 · 점수는 5점 만점 평균, 만족 비율은 4~5점 응답 비율</div></div>' +
+    var h = '<div class="toolbar"><div class="grow"><h2>' + esc(cohort) + ' 결과</h2><div class="sub">응답 ' + S.n + '명 · 점수는 5점 만점 평균, ' + esc(txt(D.config, 'posName')) + '은 4~5점 응답 비율</div></div>' +
       (cs.length > 1 ? '<select id="cohort" aria-label="기수 선택">' + cs.map(function (c) { return '<option' + (c === cohort ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>' : '') +
       '<button class="btn" id="reload">새로고침</button><button class="btn" id="qform">설문지 PDF</button><button class="btn" id="print">보고서 PDF</button><button class="btn primary" id="xlsx">엑셀 다운로드</button></div>';
 
     h += '<div class="kpis">' +
       kpi('응답자', S.n, '명', '') +
-      (first ? kpi('전반 만족도', f2(first.mean), '/ 5', '만족 비율 ' + pct(first.top2)) : '') +
-      (S.overall.length ? kpi(txt(D.config, 'overallTitle') + ' 평균', f2(allOv.mean), '/ 5', S.overall.length + '개 지표 · 만족 비율 ' + pct(allOv.top2)) : '') +
+      (first ? kpi(first.item, f2(first.mean), '/ 5', txt(D.config, 'posName') + ' ' + pct(first.top2)) : '') +
+      (S.overall.length ? kpi(txt(D.config, 'overallTitle') + ' 평균', f2(allOv.mean), '/ 5', S.overall.length + '개 지표 · ' + txt(D.config, 'posName') + ' ' + pct(allOv.top2)) : '') +
       itemAgg.map(function (a) { return kpi('과목 ' + a.k + ' 평균', f2(a.s.mean), '/ 5', S.courses.length + '개 과목 · 만족 비율 ' + pct(a.s.top2)); }).join('') + '</div>';
 
     // 설정에서 뺀 단계(문항 0개)는 결과 화면에서도 숨긴다
@@ -579,7 +579,7 @@
     h += chartCard('c-ov', txt(D.config, 'overallTitle') + ' 지표별 응답 분포', '막대 길이 = 응답 비율, 괄호 = 평균 점수', 46 + S.overall.length * 40,
       legendHTML(LIK.map(function (c, i) { return [(i + 1) + '점 ' + (S.lblOverall[i] || ''), c]; })));
     h += '<div class="minis">' + S.overall.map(function (o, i) {
-      return '<div class="card"><div class="card-h"><div><h4>' + esc(o.item) + '</h4><div class="m">평균 ' + f2(o.mean) + ' · 만족 ' + pct(o.top2) + ' · ' + o.n + '명</div></div>' +
+      return '<div class="card"><div class="card-h"><div><h4>' + esc(o.item) + '</h4><div class="m">평균 ' + f2(o.mean) + ' · ' + esc(txt(D.config, 'posName')) + ' ' + pct(o.top2) + ' · ' + o.n + '명</div></div>' +
         '<div class="act"><button class="btn sm" data-png="c-m' + i + '" data-name="' + esc(o.item) + '">저장</button></div></div><div class="chart-box" style="height:150px"><canvas id="c-m' + i + '" role="img" aria-label="' + esc(o.item) + ' 응답 분포"></canvas></div></div>';
     }).join('') + '</div>';
     }
@@ -795,7 +795,7 @@
       sum.push([txt(c, 'overallTitle') + ' 평균 (' + S.overall.length + '개 지표)', f2(allOv.mean), pct(allOv.top2)]);
     }
     agg.forEach(function (a) { sum.push(['과목 ' + a.k + ' 평균 (' + S.courses.length + '개 과목)', f2(a.s.mean), pct(a.s.top2)]); });
-    if (sum.length) h += '<section><h2>요약</h2>' + rpTable(['구분', '평균 (5점 만점)', '만족 비율 (4~5점)'], sum, [1, 2]) + '</section>';
+    if (sum.length) h += '<section><h2>요약</h2>' + rpTable(['구분', '평균 (5점 만점)', txt(c, 'posName') + ' (4~5점)'], sum, [1, 2]) + '</section>';
 
     // 과정 만족도
     if (S.overall.length) {
@@ -810,7 +810,7 @@
       };
       h += '<section><h2>' + esc(txt(c, 'overallTitle')) + '</h2>' +
         rpFig(chartImg(ovCfg, RP_W, 70 + S.overall.length * 34), '지표별 응답 분포 (막대 길이 = 응답 비율, 괄호 = 평균)') +
-        rpTable(['지표', '평균', '만족 비율', '응답'].concat([5, 4, 3, 2, 1].map(function (v) { return v + '점'; })),
+        rpTable(['지표', '평균', txt(c, 'posName'), '응답'].concat([5, 4, 3, 2, 1].map(function (v) { return v + '점'; })),
           S.overall.map(function (o) { return [o.item, f2(o.mean), pct(o.top2), o.n].concat([4, 3, 2, 1, 0].map(function (i) { return o.counts[i]; })); }),
           [1, 2, 3, 4, 5, 6, 7, 8]) + '</section>';
     }
@@ -936,7 +936,7 @@
     var p1 = function (x) { return isFinite(x) ? Math.round(x * 1000) / 10 : ''; };
 
     var sum = [[(D.config.course || '') + ' ' + cohort + ' 사후설문 결과'], ['응답자 수', S.n], [],
-      ['[과정 만족도]'], ['지표', '평균', '만족 비율(%)', '응답 수'].concat([1, 2, 3, 4, 5].map(function (v) { return v + '점 ' + (S.lblOverall[v - 1] || ''); }))];
+      ['[' + txt(D.config, 'overallTitle') + ']'], ['지표', '평균', txt(D.config, 'posName') + '(%)', '응답 수'].concat([1, 2, 3, 4, 5].map(function (v) { return v + '점 ' + (S.lblOverall[v - 1] || ''); }))];
     S.overall.forEach(function (o) { sum.push([o.item, r2(o.mean), p1(o.top2), o.n].concat(o.counts)); });
     sum.push([], ['[과목 평가 요약]'], ['구분', '평균', '만족 비율(%)', '응답 수']);
     S.itemKeys.forEach(function (k) {
@@ -980,7 +980,8 @@
     slotsTitle: '과목 평가', slotsDesc: '시간표 순서대로 과목마다 평가해 주세요. 분반 수업은 들은 수업만 고르면 됩니다.',
     splitHint: '내가 들은 수업을 고르세요',
     openTitle: '의견', openDesc: '구체적으로 적어 주시면 다음 연수에 꼭 반영하겠습니다.',
-    doneMsg: '소중한 의견 감사합니다.'
+    doneMsg: '소중한 의견 감사합니다.',
+    posName: '만족 비율'
   };
   function txt(c, k) { var t = c.texts && c.texts[k]; return (t != null && String(t).trim() !== '') ? String(t) : DEFAULT_TEXTS[k]; }
 
@@ -1014,7 +1015,8 @@
       stepCard('②', '과정 만족도 단계', '과정 전반을 5점 척도로 평가', '<div class="form">' +
         field('t-overallTitle', '단계 이름', txt(c, 'overallTitle')) + field('t-overallDesc', '단계 설명', txt(c, 'overallDesc')) +
         area('overall', '문항', c.overall.items.map(function (i) { return i.short + ' | ' + i.text; }).join('\n'), 9, '한 줄에 하나씩 "짧은 이름 | 문항". 짧은 이름은 차트와 엑셀에 쓰여요.') +
-        field('scaleA', '척도 (1점 → 5점)', c.scales.agree.join(', '), '쉼표로 5개. 화면에는 5점이 왼쪽에 보여요.') + '</div>') +
+        field('scaleA', '척도 (1점 → 5점)', c.scales.agree.join(', '), '쉼표로 5개. 화면에는 5점이 왼쪽에 보여요.')+
+        field('t-posName', '4~5점 비율 이름', txt(c, 'posName'), '결과 화면·보고서·엑셀에서 4~5점 응답 비율을 부르는 이름 (예: 만족 비율, 필요 비율)') + '</div>') +
 
       stepCard('③', '과목 평가 단계', '시간표의 과목마다 아래 문항을 5점 척도로 평가', '<div class="form">' +
         field('t-slotsTitle', '단계 이름', txt(c, 'slotsTitle')) + field('t-slotsDesc', '단계 설명', txt(c, 'slotsDesc')) +
