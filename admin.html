@@ -498,6 +498,19 @@
   function openSurvey(id, which, force) {
     charts.forEach(function (c) { c.destroy(); }); charts = [];
     CUR = id; tab = which || 'dash'; cohort = null;
+    // 설정만 볼 때는 무거운 결과(응답 전체) 대신 설정만 가볍게 받는다. 결과는 뒤에서 미리 받아 둔다.
+    var c = RES[id], meta = SURVEYS.filter(function (s) { return s.id === id; })[0];
+    if (tab === 'cfg' && !(c && Date.now() - c.t < 120000)) {
+      loading('설정을 불러오는 중');
+      api('getSurvey', id).then(function (r) {
+        if (CUR !== id) return;
+        loading(null);
+        D = { meta: meta || { id: id, title: r.config.title, course: r.config.course, cohort: r.config.cohort, status: r.status, count: 0 }, config: r.config, resp: { headers: [], rows: [] }, scores: { headers: [], rows: [] }, partial: true };
+        render();
+        fetchResults(id).catch(function () { /* 결과 탭을 누를 때 다시 시도 */ });
+      }).catch(function (e) { loading(null); toast(errMsg(e)); loadList(); });
+      return;
+    }
     loading('결과를 불러오는 중');
     fetchResults(id, force).then(function (d) {
       if (CUR !== id) return; // 기다리는 사이 다른 설문을 눌렀으면 무시
@@ -620,7 +633,7 @@
       '<button class="btn" id="copy-link">응답 링크 복사</button><button class="btn" id="toggle">' + (m.status === OPEN ? '마감하기' : '다시 열기') + '</button>' +
       (m.sheetUrl && m.sheetUrl !== 'about:blank' ? '<a class="btn" href="' + esc(m.sheetUrl) + '" target="_blank" rel="noopener">시트 열기</a>' : '') +
       '</div></header><div class="wrap" id="body"></div>';
-    root.querySelectorAll('[data-tab]').forEach(function (b) { b.onclick = function () { tab = b.dataset.tab; render(); }; });
+    root.querySelectorAll('[data-tab]').forEach(function (b) { b.onclick = function () { if (b.dataset.tab === 'dash' && D.partial) return openSurvey(CUR, 'dash'); tab = b.dataset.tab; render(); }; });
     document.getElementById('back').onclick = loadList;
     document.getElementById('copy-link').onclick = function () { copyLink(CUR); };
     document.getElementById('toggle').onclick = function () {
@@ -1341,7 +1354,7 @@
     collect();
     var cfg = JSON.parse(JSON.stringify(W));
     // 척도 묶음의 시트 열 머리·영역 이름: 응답이 쌓인 뒤에는 바꾸지 않는다(이어지도록). 응답이 없을 때는 지금 이름을 따른다.
-    var fresh = !(D.resp && D.resp.rows.length);
+    var fresh = D.partial ? !(D.meta && +D.meta.count) : !(D.resp && D.resp.rows.length);
     cfg.sections.forEach(function (s) { s.blocks.forEach(function (b) {
       if (b.type !== 'scale') return;
       if (fresh || !b.prefix) b.prefix = b.title || s.title;
@@ -1354,6 +1367,7 @@
     var btn = document.getElementById('save'); btn.disabled = true; btn.textContent = '저장 중…';
     api('saveConfig', KEY, CUR, cfg).then(function () {
       D.config = cfg; W = JSON.parse(JSON.stringify(cfg));
+      if (D.partial) delete RES[CUR]; // 미리 받아 둔 결과는 예전 설정 기준이라 버린다
       D.meta.title = cfg.title; D.meta.course = cfg.course; D.meta.cohort = cfg.cohort;
       document.querySelector('.top h1').innerHTML = esc(cfg.title) + statusBadge(D.meta.status);
       toast('저장했어요. 응답 화면에 바로 반영돼요.');
