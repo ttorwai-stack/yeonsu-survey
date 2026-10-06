@@ -348,7 +348,22 @@
     Promise.all([api('listSurveys', KEY), APPURL ? APPURL : api('getAppUrl').catch(function () { return ''; })]).then(function (r) {
       SURVEYS = r[0]; APPURL = r[1] || APPURL; ss('svy-admin', KEY);
       loading(null); renderList();
+      // 목록을 보는 동안 진행 중인 설문(없으면 맨 위 설문) 결과를 미리 받아 둔다 → 누르면 바로 열림
+      var pre = SURVEYS.filter(function (s) { return s.status === OPEN; }).slice(0, 2);
+      if (!pre.length && SURVEYS[0]) pre = [SURVEYS[0]];
+      pre.forEach(function (s) { fetchResults(s.id).catch(function () { /* 누를 때 다시 시도 */ }); });
     }).catch(function (e) { loading(null); KEY = ''; ss('svy-admin', ''); showLogin(errMsg(e)); });
+  }
+
+  // 결과 요청은 설문마다 2분간 재사용한다 (미리 받기·진행 중인 요청 포함). 새로고침 버튼은 force로 새로 받는다.
+  var RES = {};
+  function fetchResults(id, force) {
+    var c = RES[id];
+    if (!force && c && Date.now() - c.t < 120000) return c.p;
+    var p = api('getResults', KEY, id);
+    RES[id] = { t: Date.now(), p: p };
+    p.catch(function () { if (RES[id] && RES[id].p === p) delete RES[id]; });
+    return p;
   }
 
   // 불러오는 동안 몇 초째인지 보여 준다 (구글 서버가 깨어나거나 제출이 몰릴 때 몇 초 걸릴 수 있음)
@@ -418,11 +433,12 @@
     }).catch(function (e) { btn.disabled = false; toast(errMsg(e)); });
   }
 
-  function openSurvey(id, which) {
+  function openSurvey(id, which, force) {
     charts.forEach(function (c) { c.destroy(); }); charts = [];
     CUR = id; tab = which || 'dash'; cohort = null;
     loading('결과를 불러오는 중');
-    api('getResults', KEY, id).then(function (d) {
+    fetchResults(id, force).then(function (d) {
+      if (CUR !== id) return; // 기다리는 사이 다른 설문을 눌렀으면 무시
       loading(null);
       D = d;
       var cs = cohorts();
@@ -578,7 +594,7 @@
       '<div class="legend" id="cr-legend" style="margin:0"></div></div>');
     h += '<div class="card"><div class="card-h"><div><h3>과목별 상세</h3><div class="d">시간표 순서 · 열 제목을 누르면 정렬</div></div></div><div class="tbl-wrap"><table id="crs-tbl"><thead><tr>' +
       '<th data-sort="pos">일자</th><th>시간</th><th data-sort="title">과목</th><th>강사</th><th class="num" data-sort="n">응답</th>' +
-      S.itemKeys.map(function (k, i) { return '<th class="num" data-sort="m' + i + '">' + esc(k) + ' 평균</th><th class="num" data-sort="t' + i + '">' + esc(k) + ' 만족</th>'; }).join('') +
+      S.itemKeys.map(function (k, i) { return '<th class="num" data-sort="m' + i + '">' + esc(k) + ' 평균</th><th class="num" data-sort="t' + i + '">' + esc(k) + ' 만족 비율</th>'; }).join('') +
       '</tr></thead><tbody></tbody></table></div></div>';
     }
 
@@ -597,7 +613,7 @@
     body.innerHTML = h;
 
     var sel = document.getElementById('cohort'); if (sel) sel.onchange = function () { cohort = sel.value; render(); };
-    document.getElementById('reload').onclick = function () { openSurvey(CUR, 'dash'); };
+    document.getElementById('reload').onclick = function () { openSurvey(CUR, 'dash', true); };
     document.getElementById('print').onclick = function () { openReport(S); };
     document.getElementById('qform').onclick = openQuestionnaire;
     document.getElementById('xlsx').onclick = function () { exportXlsx(S); };
@@ -806,10 +822,10 @@
         var cfg = courseChartConfig(S, { metric: String(i), sort: 'desc' }, true);
         h += '<h3>' + esc(k) + ' 점수 순위</h3>' + rpFig(chartImg(cfg, RP_W, cfg._height), k + ' 평균 점수가 높은 순 (1~5점)');
       });
-      h += '<h3>과목별 상세 (시간표순)</h3>' + rpTable(['일자', '시간', '과목', '강사', '응답'].concat([].concat.apply([], S.itemKeys.map(function (k) { return [k + ' 평균', k + ' 만족']; }))),
+      h += '<h3>과목별 상세 (시간표순)</h3>' + rpTable(['일자', '시간', '과목', '강사', '응답'].concat([].concat.apply([], S.itemKeys.map(function (k) { return [k + ' 평균', k + ' 만족 비율']; }))),
         S.courses.slice().sort(function (a, b) { return a.pos - b.pos; }).map(function (x) {
           return [x.date, x.time, x.title + (x.split ? ' (분반)' : ''), x.inst, x.n].concat([].concat.apply([], S.itemKeys.map(function (k) { return [f2(x.by[k].mean), pct(x.by[k].top2)]; })));
-        }), [4, 5, 6, 7, 8]) + '</section>';
+        }), [4, 5, 6, 7, 8]) + '<div class="rp-cap">평균 = 5점 만점 평균 · 만족 비율 = 5점 척도에서 위쪽 두 칸(5점·4점)을 고른 사람의 비율</div></section>';
     }
 
     // 응답자 구성: 항목별 작은 표
@@ -1137,6 +1153,8 @@
 
   /* ───── 시작 ───── */
   KEY = ss('svy-admin') || '';
+  // 한동안 안 쓰면 구글 서버가 잠들어 첫 요청이 20초 넘게 걸린다 → 비밀번호 치는 동안 미리 깨워 둔다
+  if (MODE === 'http') api('listOpenSurveys').catch(function () { /* 깨우기용 */ });
   if (KEY) loadList();
   else showLogin();
 })();
