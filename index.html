@@ -4,7 +4,7 @@
 <base target="_top">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>연수 사후설문</title>
+<title>연수 설문</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
   :root {
@@ -35,7 +35,8 @@
   .top { position: sticky; top: 0; z-index: 10; background: rgba(243,244,246,.94); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
   .top-in { max-width: 760px; margin: 0 auto; padding: 12px 16px 10px; }
   .top h1 { font-size: 16px; margin: 0 0 8px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .steps { display: flex; gap: 6px; margin-bottom: 8px; }
+  .steps { display: flex; gap: 6px; margin-bottom: 8px; overflow-x: auto; scrollbar-width: none; }
+  .steps::-webkit-scrollbar { display: none; }
   .step { flex: 1; font-size: 12.5px; color: var(--ink-3); text-align: center; padding: 6px 2px; border-radius: 8px; background: transparent; border: 0; cursor: pointer; white-space: nowrap; }
   .step b { display: inline-block; width: 18px; height: 18px; line-height: 18px; border-radius: 50%; background: var(--line); color: var(--ink-2); font-size: 11px; margin-right: 4px; }
   .step.on { color: var(--accent-ink); font-weight: 700; background: var(--accent-soft); }
@@ -51,7 +52,8 @@
   .intro .meta { color: var(--ink-2); font-size: 14px; }
   .intro p { margin: 10px 0 0; color: var(--ink-2); font-size: 14.5px; white-space: pre-line; } /* 설정에서 넣은 줄바꿈 그대로 */
   .sec-title { font-size: 18px; font-weight: 700; margin: 6px 2px 4px; }
-  .sec-desc { font-size: 14px; color: var(--ink-2); margin: 0 2px 14px; }
+  .sec-desc { font-size: 14px; color: var(--ink-2); margin: 0 2px 14px; white-space: pre-line; }
+  .blk-t { font-size: 15px; font-weight: 700; color: var(--accent-ink); margin-bottom: 12px; }
   .day { font-size: 14px; font-weight: 700; color: var(--ink-2); margin: 22px 2px 8px; }
 
   .card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--line); padding: 16px; margin-bottom: 12px; transition: border-color .2s, box-shadow .2s; }
@@ -87,6 +89,14 @@
   .chip span { display: inline-block; padding: 9px 14px; border: 1.5px solid var(--line); border-radius: 99px; background: #fff; cursor: pointer; font-size: 15px; }
   .chip input:focus-visible + span { outline: 2px dashed #6b7280; outline-offset: 2px; }
   .chip input:checked + span { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .q-hint { font-size: 13px; color: var(--ink-2); margin: -4px 0 10px; }
+  /* 순위 매기기: 누른 순서대로 번호가 붙는다 */
+  .rk { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border: 1.5px solid var(--line); border-radius: 99px; background: #fff; cursor: pointer; font: inherit; font-size: 15px; color: var(--ink); -webkit-tap-highlight-color: transparent; }
+  .rk .no { display: none; min-width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 12.5px; font-weight: 700; align-items: center; justify-content: center; }
+  .rk.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .rk.on .no { display: inline-flex; }
+  .rk:focus-visible { outline: 2px dashed #6b7280; outline-offset: 2px; }
+  .rk-sum { font-size: 13px; color: var(--accent-ink); margin-top: 8px; }
   .other-in { margin-top: 8px; width: 100%; padding: 10px 12px; border: 1.5px solid var(--line); border-radius: 10px; }
   .other-in:focus, textarea:focus { outline: none; border-color: var(--accent); }
 
@@ -231,75 +241,109 @@
   }
 
   /* ───── 상태 ───── */
+  // 설문 = 섹션 여러 개(한 섹션 = 한 페이지), 섹션 안에 문항 블록(객관식·척도 묶음·시간표·서술형)을 자유롭게 배치
+  // A = { ans: {블록ID: 값}, other: {블록ID: 기타 내용} }
+  //   객관식: 하나 = '값' / 여러 개·순위 = ['값', …] ('__other' = 기타) · 척도: [점수…] · 시간표: {칸ID: {choice, scores}} · 서술형: '글'
   var cfg, A, SID = '', step = 0, EDIT = null;
   var app = document.getElementById('app');
 
-  // 화면 문구: 설정(cfg.texts)에 있으면 그 값, 비어 있으면 기본값 (Code.gs defaultTexts_와 같은 값)
-  var DEFAULT_TEXTS = {
-    demoTitle: '기본 정보', demoDesc: '통계 분석에만 쓰이며, 개인을 식별하지 않습니다.',
-    overallTitle: '과정 만족도', overallDesc: '교육과정과 연수 운영 전반에 대해 평가해 주세요.',
-    slotsTitle: '과목 평가', slotsDesc: '시간표 순서대로 과목마다 평가해 주세요. 분반 수업은 들은 수업만 고르면 됩니다.',
-    splitHint: '내가 들은 수업을 고르세요',
-    openTitle: '의견', openDesc: '구체적으로 적어 주시면 다음 연수에 꼭 반영하겠습니다.',
-    doneMsg: '소중한 의견 감사합니다.'
-  };
-  function T(k) { var t = cfg && cfg.texts && cfg.texts[k]; return (t != null && String(t).trim() !== '') ? String(t) : DEFAULT_TEXTS[k]; }
   function normalize(c) {
-    c.demographics = c.demographics || []; c.slots = c.slots || []; c.open = c.open || []; c.sessionItems = c.sessionItems || [];
-    c.overall = c.overall || { scale: 'agree', items: [] }; c.overall.items = c.overall.items || [];
+    c.sections = (c.sections || []).filter(function (s) { return s.blocks && s.blocks.length; });
     return c;
   }
-  // 단계: 0 기본정보 / 1 과정만족도 / 2 과목평가 / 3 의견·제출. 문항이 없는 단계는 건너뛴다.
-  function stepNames() { return [T('demoTitle'), T('overallTitle'), T('slotsTitle'), cfg.open.length ? T('openTitle') + ' · 제출' : '제출']; }
-  function active() { return [cfg.demographics.length > 0, cfg.overall.items.length > 0, cfg.slots.length > 0, true]; }
-  function firstStep() { return active().indexOf(true); }
+  function eachBlock(fn) { cfg.sections.forEach(function (s, si) { s.blocks.forEach(function (b) { fn(b, si); }); }); }
+  function findBlock(id) { var r = null; eachBlock(function (b) { if (b.id === id) r = b; }); return r; }
+  function lastStep() { return cfg.sections.length - 1; }
+  function doneMsg() { return cfg.doneMsg || '소중한 의견 감사합니다.'; }
 
   function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } }
   function draftKey() { return 'svy-draft-' + SID; }
   function saveDraft() { store(draftKey(), JSON.stringify(A)); }
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
-  function lastName(s) { var p = String(s || '').trim().split(/\s+/); return p[p.length - 1]; }
 
   function emptyAnswers() {
-    var a = { demo: {}, other: {}, overall: cfg.overall.items.map(function () { return null; }), slots: {}, open: {} };
-    cfg.slots.forEach(function (s) { a.slots[s.id] = { choice: s.options.length === 1 ? 0 : null, scores: {} }; });
+    var a = { ans: {}, other: {} };
+    eachBlock(function (b) {
+      if (b.type === 'scale') a.ans[b.id] = b.items.map(function () { return null; });
+      else if (b.type === 'timetable') { var t = a.ans[b.id] = {}; b.slots.forEach(function (s) { t[s.id] = { choice: s.options.length === 1 ? 0 : null, scores: {} }; }); }
+    });
+    return a;
+  }
+  // 저장해 둔 답(임시 저장·제출 기록)을 지금 설정에 맞춰 옮긴다. 예전 형식(demo/overall/slots/open)도 받는다.
+  function adoptAnswers(saved) {
+    var a = emptyAnswers();
+    if (!saved || typeof saved !== 'object') return a;
+    var ans = saved.ans, other = saved.other || {};
+    if (!ans) {
+      ans = {};
+      Object.keys(saved.demo || {}).forEach(function (k) { ans[k] = saved.demo[k]; });
+      if (saved.overall) ans.overall = saved.overall;
+      if (saved.slots) ans.slots = saved.slots;
+      Object.keys(saved.open || {}).forEach(function (k) { ans[k] = saved.open[k]; });
+    }
+    eachBlock(function (b) {
+      var v = ans[b.id];
+      if (other[b.id] != null) a.other[b.id] = String(other[b.id]);
+      if (v == null) return;
+      if (b.type === 'scale') { if (Array.isArray(v) && v.length === b.items.length) a.ans[b.id] = v; }
+      else if (b.type === 'timetable') { b.slots.forEach(function (s) { var x = v[s.id]; if (x && x.scores && (x.choice == null || s.options[x.choice])) a.ans[b.id][s.id] = x; }); }
+      else if (b.type === 'choice') { if ((b.mode === 'multi' || b.mode === 'rank') === Array.isArray(v)) a.ans[b.id] = v; }
+      else a.ans[b.id] = String(v);
+    });
     return a;
   }
 
-  /* ───── 필수 항목 목록 (단계별) ───── */
-  function requiredList() {
-    var L = [[], [], [], []];
-    cfg.demographics.forEach(function (d) {
-      var v = A.demo[d.id];
-      L[0].push({ id: 'd-' + d.id, ok: !!v && (v !== '__other' || !!(A.other[d.id] || '').trim()) });
-    });
-    cfg.overall.items.forEach(function (_, i) { L[1].push({ id: 'o-' + i, ok: !!A.overall[i] }); });
-    cfg.slots.forEach(function (s) {
-      var a = A.slots[s.id];
-      var ok = a.choice != null && cfg.sessionItems.every(function (it) { return !!a.scores[it.key]; });
-      L[2].push({ id: 's-' + s.id, ok: ok, weight: (s.options.length > 1 ? 1 : 0) + cfg.sessionItems.length,
-        done: (a.choice != null && s.options.length > 1 ? 1 : 0) + cfg.sessionItems.filter(function (it) { return !!a.scores[it.key]; }).length });
-    });
-    cfg.open.forEach(function (q) { if (q.required) L[3].push({ id: 'q-' + q.id, ok: !!String(A.open[q.id] || '').trim() }); });
-    return L;
+  /* ───── 객관식 (하나 / 여러 개 / 순위) ───── */
+  function chMode(b) { return b.mode === 'multi' || b.mode === 'rank' ? b.mode : 'single'; }
+  function chAll(b) { return b.options.length + (b.other ? 1 : 0); }
+  function chK(b) { var m = parseInt(b.max, 10); return m >= 1 ? Math.min(m, chAll(b)) : chAll(b); }
+  function chList(b) { var v = A.ans[b.id]; return Array.isArray(v) ? v : []; }
+  function chHasOther(b) { var v = A.ans[b.id]; return Array.isArray(v) ? v.indexOf('__other') >= 0 : v === '__other'; }
+  function chDone(b) {
+    var t = chMode(b);
+    var picked = t === 'single' ? !!A.ans[b.id] : t === 'multi' ? chList(b).length > 0 : chList(b).length === chK(b);
+    return picked && (!chHasOther(b) || !!(A.other[b.id] || '').trim());
+  }
+  function chHint(b) {
+    var t = chMode(b), k = chK(b);
+    if (t === 'multi') return k >= chAll(b) ? '해당하는 것을 모두 골라 주세요.' : '최대 ' + k + '개까지 고를 수 있어요.';
+    if (t === 'rank') return '중요한 순서대로 ' + k + '개를 눌러 주세요. 누른 순서가 순위가 되고, 다시 누르면 빠져요.';
+    return '';
   }
 
+  /* ───── 필수 항목 목록 (섹션별) ───── */
+  function requiredList(i) {
+    var L = [];
+    cfg.sections[i].blocks.forEach(function (b) {
+      if (b.type === 'choice') L.push({ id: 'b-' + b.id, ok: chDone(b) });
+      else if (b.type === 'scale') b.items.forEach(function (_, k) { L.push({ id: 'b-' + b.id + '-' + k, ok: !!A.ans[b.id][k] }); });
+      else if (b.type === 'timetable') b.slots.forEach(function (s) {
+        var a = A.ans[b.id][s.id], split = s.options.length > 1;
+        var got = b.items.filter(function (it) { return !!a.scores[it.key]; }).length;
+        L.push({ id: 's-' + s.id, ok: a.choice != null && got === b.items.length, weight: (split ? 1 : 0) + b.items.length, done: (split && a.choice != null ? 1 : 0) + got });
+      });
+      else if (b.type === 'text' && b.required) L.push({ id: 'b-' + b.id, ok: !!String(A.ans[b.id] || '').trim() });
+    });
+    return L;
+  }
+  function requiredAll() { return cfg.sections.map(function (_, i) { return requiredList(i); }); }
+
   function updateProgress() {
-    var L = requiredList(), total = 0, done = 0;
+    var L = requiredAll(), total = 0, done = 0;
     L.forEach(function (arr) { arr.forEach(function (r) { var w = r.weight || 1; total += w; done += r.weight ? r.done : (r.ok ? 1 : 0); }); });
-    var pct = total ? Math.round(done / total * 100) : 0;
+    var pct = total ? Math.round(done / total * 100) : 100;
     var bar = document.getElementById('bar'); if (bar) bar.style.width = pct + '%';
-    var bt = document.getElementById('bar-txt'); if (bt) bt.textContent = '필수 응답 ' + done + ' / ' + total + ' (' + pct + '%)';
+    var bt = document.getElementById('bar-txt'); if (bt) bt.textContent = total ? '필수 응답 ' + done + ' / ' + total + ' (' + pct + '%)' : '';
     document.querySelectorAll('.step').forEach(function (el) {
       var i = +el.dataset.step;
       el.classList.toggle('done', i !== step && L[i].length > 0 && L[i].every(function (r) { return r.ok; }));
     });
-    L[2].forEach(function (r) { var c = document.getElementById(r.id); if (c) c.classList.toggle('complete', r.ok); });
+    (L[step] || []).forEach(function (r) { if (r.weight != null) { var c = document.getElementById(r.id); if (c) c.classList.toggle('complete', r.ok); } });
   }
 
   /* ───── 렌더링 ───── */
-  // 왼쪽이 5점(매우 그렇다), 오른쪽이 1점(전혀 아니다). 저장 값은 그대로 1~5.
+  // 왼쪽이 5점(예: 매우 그렇다), 오른쪽이 1점. 저장 값은 그대로 1~5.
   // 라벨은 다섯 개 모두 같은 굵기·색으로 (특정 선택지를 강조하면 응답이 쏠릴 수 있음)
   function scaleHTML(name, labels, val, disabled, unit) {
     var h = '<div' + (unit ? ' data-unit' : '') + ' class="scale' + (disabled ? ' disabled' : '') + '" role="radiogroup">';
@@ -311,28 +355,20 @@
   }
 
   function render() {
-    var act = active(), n = 0, names = stepNames();
-    var html = '<div class="top"><div class="top-in"><h1>' + esc(cfg.title) + '</h1><div class="steps">' +
-      names.map(function (t, i) {
-        if (!act[i]) return '';
-        n++;
-        return '<button type="button" class="step' + (i === step ? ' on' : '') + '" data-step="' + i + '"><b>' + n + '</b>' + esc(t) + '</button>';
-      }).join('') +
-      '</div><div class="bar"><i id="bar"></i></div><div class="bar-txt" id="bar-txt"></div></div></div><main>' +
+    var html = '<div class="top"><div class="top-in"><h1>' + esc(cfg.title) + '</h1>' +
+      (cfg.sections.length > 1 ? '<div class="steps">' + cfg.sections.map(function (s, i) {
+        return '<button type="button" class="step' + (i === step ? ' on' : '') + '" data-step="' + i + '"><b>' + (i + 1) + '</b>' + esc(s.title) + '</button>';
+      }).join('') + '</div>' : '') +
+      '<div class="bar"><i id="bar"></i></div><div class="bar-txt" id="bar-txt"></div></div></div><main>' +
       (EDIT ? '<div class="edit-banner">제출했던 응답을 수정하고 있어요. 다시 제출하면 기존 응답이 바뀌어요.</div>' : '');
-
-    if (step === firstStep()) html += renderIntro();
-    if (step === 0) html += renderDemo();
-    if (step === 1) html += renderOverall();
-    if (step === 2) html += renderSlots();
-    if (step === 3) html += renderOpen();
-
-    var hasPrev = act.slice(0, step).some(Boolean);
+    if (step === 0) html += renderIntro();
+    html += renderSection(step);
     html += '</main><div class="nav"><div class="nav-in">' +
-      (hasPrev ? '<button type="button" class="btn" id="prev">이전</button>' : '') +
-      (step < 3 ? '<button type="button" class="btn primary" id="next">다음</button>' : '<button type="button" class="btn primary" id="submit">' + (EDIT ? '수정 내용 제출' : '제출하기') + '</button>') +
+      (step > 0 ? '<button type="button" class="btn" id="prev">이전</button>' : '') +
+      (step < lastStep() ? '<button type="button" class="btn primary" id="next">다음</button>' : '<button type="button" class="btn primary" id="submit">' + (EDIT ? '수정 내용 제출' : '제출하기') + '</button>') +
       '</div></div>';
     app.innerHTML = html;
+    var on = app.querySelector('.step.on'); if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest', inline: 'center' });
     updateProgress();
   }
 
@@ -342,104 +378,135 @@
       (cfg.intro ? '<p>' + esc(cfg.intro) + '</p>' : '') + '</div>';
   }
 
-  function secHead(titleKey, descKey) {
-    var d = T(descKey);
-    return '<div class="sec-title">' + esc(T(titleKey)) + '</div>' + (d ? '<p class="sec-desc">' + esc(d) + '</p>' : '');
-  }
-
-  function renderDemo() {
-    var h = secHead('demoTitle', 'demoDesc') + '<div class="card">';
-    cfg.demographics.forEach(function (d, i) {
-      var v = A.demo[d.id];
-      h += '<div class="q" data-unit id="d-' + esc(d.id) + '"><div class="qt"><span class="n">' + (i + 1) + '.</span>' + esc(d.label) + '<span class="req">*</span></div><div class="chips">' +
-        d.options.map(function (o) {
-          return '<label class="chip"><input type="radio" name="demo:' + esc(d.id) + '" value="' + esc(o) + '"' + (v === o ? ' checked' : '') + '><span>' + esc(o) + '</span></label>';
-        }).join('') +
-        (d.other ? '<label class="chip"><input type="radio" name="demo:' + esc(d.id) + '" value="__other"' + (v === '__other' ? ' checked' : '') + '><span>기타</span></label>' : '') +
-        '</div>' +
-        (d.other && v === '__other' ? '<input class="other-in" data-other="' + esc(d.id) + '" placeholder="' + esc(d.placeholder || '직접 입력') + '" aria-label="' + esc(d.label) + ' 기타 내용" value="' + esc(A.other[d.id] || '') + '">' : '') +
-        '<div class="warn">' + (d.other && v === '__other' ? '기타 내용을 적어 주세요.' : '선택해 주세요.') + '</div></div>';
+  // 객관식·서술형은 이어지는 것끼리 한 카드에, 척도 묶음은 카드 하나, 시간표는 과목마다 카드
+  function renderSection(i) {
+    var s = cfg.sections[i], n = 0, card = false;
+    var h = '<div class="sec-title">' + esc(s.title) + '</div>' + (s.desc ? '<p class="sec-desc">' + esc(s.desc) + '</p>' : '');
+    function open() { if (!card) { h += '<div class="card">'; card = true; } }
+    function close() { if (card) { h += '</div>'; card = false; } }
+    s.blocks.forEach(function (b) {
+      if (b.type === 'choice') { open(); h += choiceHTML(b, ++n); }
+      else if (b.type === 'text') { open(); h += textHTML(b, ++n); }
+      else if (b.type === 'scale') {
+        close();
+        h += '<div class="card">' + (b.title ? '<div class="blk-t">' + esc(b.title) + '</div>' : '') +
+          b.items.map(function (it, k) { return scaleItemHTML(b, k, ++n); }).join('') + '</div>';
+      } else if (b.type === 'timetable') { close(); h += timetableHTML(b); }
     });
-    return h + '</div>';
+    close();
+    return h;
   }
 
-  function renderOverall() {
-    var labels = cfg.scales[cfg.overall.scale];
-    var h = secHead('overallTitle', 'overallDesc') + '<div class="card">';
-    cfg.overall.items.forEach(function (it, i) {
-      h += '<div class="q" data-unit id="o-' + i + '"><div class="qt"><span class="n">' + (i + 1) + '.</span>' + esc(it.text) + '<span class="req">*</span></div>' +
-        scaleHTML('ov:' + i, labels, A.overall[i]) + '<div class="warn">응답해 주세요.</div></div>';
-    });
-    return h + '</div>';
+  function qHead(n, label, req) {
+    return '<div class="qt"><span class="n">' + n + '.</span>' + esc(label) + (req ? '<span class="req">*</span>' : '<span class="opt-note">(선택)</span>') + '</div>';
   }
 
-  function slotCard(s) {
-    var a = A.slots[s.id], split = s.options.length > 1, o = a.choice != null ? s.options[a.choice] : null;
-    var h = '<div class="card" id="s-' + esc(s.id) + '"><div class="sess-h"><span class="when">' + esc(s.time) + '</span><div>';
-    if (split) {
-      h += '<div class="sess-t">분반 수업<span class="split-badge">택 1</span></div><div class="sess-i">' + (o ? esc(o.title) + ' · ' + esc(o.instructor) : '수강한 분반을 선택해 주세요') + '</div>';
+  function choiceHTML(b, n) {
+    var t = chMode(b), v = A.ans[b.id], list = chList(b), hint = chHint(b);
+    var opts = b.options.map(function (o) { return [o, o]; }).concat(b.other ? [['__other', '기타']] : []);
+    var h = '<div class="q" data-unit data-n="' + n + '"' + (t !== 'single' ? ' data-kind="' + t + '"' : '') + (chDone(b) ? ' data-done="1"' : '') + ' id="b-' + esc(b.id) + '">' +
+      qHead(n, b.label, true) + (hint ? '<p class="q-hint">' + esc(hint) + '</p>' : '') + '<div class="chips">';
+    if (t === 'rank') {
+      h += opts.map(function (o) {
+        var r = list.indexOf(o[0]);
+        return '<button type="button" class="rk' + (r >= 0 ? ' on' : '') + '" data-rank="' + esc(b.id) + '" data-v="' + esc(o[0]) + '" aria-pressed="' + (r >= 0) + '"' + (r >= 0 ? ' aria-label="' + esc(o[1]) + ' ' + (r + 1) + '순위"' : '') + '><span class="no">' + (r + 1) + '</span>' + esc(o[1]) + '</button>';
+      }).join('') + '</div>' +
+        (list.length ? '<div class="rk-sum">' + list.map(function (x, r) { return (r + 1) + '순위 ' + esc(x === '__other' ? '기타' : x); }).join(' · ') + '</div>' : '');
     } else {
-      h += '<div class="sess-t">' + esc(o.title) + '</div>' + (o.instructor ? '<div class="sess-i">강사 ' + esc(o.instructor) + '</div>' : '');
-    }
-    h += '</div><span class="done-mark" aria-hidden="true"></span></div>';
-    if (split) {
-      h += '<p class="pick-hint">' + esc(T('splitHint')) + ' <span class="req">*</span></p><div class="pick" data-unit>' + s.options.map(function (op, i) {
-        return '<label class="chip"><input type="radio" name="pick:' + esc(s.id) + '" value="' + i + '"' + (a.choice === i ? ' checked' : '') + '><span>' + esc(op.title) + '<small>' + esc(op.instructor) + '</small></span></label>';
+      var multi = t === 'multi';
+      h += opts.map(function (o) {
+        var on = multi ? list.indexOf(o[0]) >= 0 : v === o[0];
+        return '<label class="chip"><input type="' + (multi ? 'checkbox' : 'radio') + '" name="ch:' + esc(b.id) + '" value="' + esc(o[0]) + '"' + (on ? ' checked' : '') + '><span>' + esc(o[1]) + '</span></label>';
       }).join('') + '</div>';
     }
-    cfg.sessionItems.forEach(function (it) {
-      h += '<div class="sq"><em>' + esc(it.key) + '</em>' + esc(it.text) + '</div>' +
-        scaleHTML('sl:' + s.id + ':' + it.key, cfg.scales[it.scale], a.scores[it.key], a.choice == null, true);
-    });
-    return h + '<div class="warn">' + (split ? '분반을 선택하고 ' : '') + '모든 문항에 응답해 주세요.</div></div>';
+    var other = b.other && chHasOther(b);
+    return h + (other ? '<input class="other-in" data-other="' + esc(b.id) + '" placeholder="' + esc(b.placeholder || '직접 입력') + '" aria-label="' + esc(b.label) + ' 기타 내용" value="' + esc(A.other[b.id] || '') + '">' : '') +
+      '<div class="warn">' + (other && !(A.other[b.id] || '').trim() ? '기타 내용을 적어 주세요.' : t === 'rank' ? chK(b) + '순위까지 매겨 주세요.' : '선택해 주세요.') + '</div></div>';
   }
 
-  function renderSlots() {
-    var h = secHead('slotsTitle', 'slotsDesc');
-    var lastDate = null;
-    cfg.slots.forEach(function (s) {
+  function textHTML(b, n) {
+    return '<div class="q" id="b-' + esc(b.id) + '">' + qHead(n, b.text, b.required) +
+      '<textarea data-text="' + esc(b.id) + '" maxlength="2000">' + esc(A.ans[b.id] || '') + '</textarea>' +
+      (b.required ? '<div class="warn">응답해 주세요.</div>' : '') + '</div>';
+  }
+
+  function scaleItemHTML(b, k, n) {
+    return '<div class="q" data-unit id="b-' + esc(b.id) + '-' + k + '">' + qHead(n, b.items[k].text, true) +
+      scaleHTML('sc:' + b.id + ':' + k, b.labels, A.ans[b.id][k]) + '<div class="warn">응답해 주세요.</div></div>';
+  }
+
+  function timetableHTML(b) {
+    var h = '', lastDate = null;
+    b.slots.forEach(function (s) {
       if (s.date !== lastDate) { h += '<div class="day">' + esc(s.date) + '</div>'; lastDate = s.date; }
-      h += slotCard(s);
+      h += slotCard(b, s);
     });
     return h;
   }
 
-  function renderOpen() {
-    if (!cfg.open.length) return '<div class="center" style="padding:30px 10px"><p>모든 문항에 응답하셨어요. 아래 [제출하기]를 눌러 주세요.</p></div>';
-    var h = secHead('openTitle', 'openDesc') + '<div class="card">';
-    cfg.open.forEach(function (q, i) {
-      h += '<div class="q" id="q-' + esc(q.id) + '"><div class="qt"><span class="n">' + (i + 1) + '.</span>' + esc(q.text) +
-        (q.required ? '<span class="req">*</span>' : '<span class="opt-note">(선택)</span>') + '</div>' +
-        '<textarea data-open="' + esc(q.id) + '" maxlength="2000">' + esc(A.open[q.id] || '') + '</textarea>' +
-        (q.required ? '<div class="warn">응답해 주세요.</div>' : '') + '</div>';
+  function slotCard(b, s) {
+    var a = A.ans[b.id][s.id], split = s.options.length > 1, o = a.choice != null ? s.options[a.choice] : null;
+    var h = '<div class="card" id="s-' + esc(s.id) + '"><div class="sess-h"><span class="when">' + esc(s.time) + '</span><div>';
+    if (split) h += '<div class="sess-t">분반 수업<span class="split-badge">택 1</span></div><div class="sess-i">' + (o ? esc(o.title) + ' · ' + esc(o.instructor) : '수강한 분반을 선택해 주세요') + '</div>';
+    else h += '<div class="sess-t">' + esc(o.title) + '</div>' + (o.instructor ? '<div class="sess-i">강사 ' + esc(o.instructor) + '</div>' : '');
+    h += '</div><span class="done-mark" aria-hidden="true"></span></div>';
+    if (split) {
+      h += '<p class="pick-hint">' + esc(b.splitHint || '내가 들은 수업을 고르세요') + ' <span class="req">*</span></p><div class="pick" data-unit>' + s.options.map(function (op, i) {
+        return '<label class="chip"><input type="radio" name="pick:' + esc(b.id) + ':' + esc(s.id) + '" value="' + i + '"' + (a.choice === i ? ' checked' : '') + '><span>' + esc(op.title) + '<small>' + esc(op.instructor) + '</small></span></label>';
+      }).join('') + '</div>';
+    }
+    b.items.forEach(function (it) {
+      h += '<div class="sq"><em>' + esc(it.key) + '</em>' + esc(it.text) + '</div>' +
+        scaleHTML('sl:' + b.id + ':' + s.id + ':' + it.key, b.labels, a.scores[it.key], a.choice == null, true);
     });
-    return h + '</div>';
+    return h + '<div class="warn">' + (split ? '분반을 선택하고 ' : '') + '모든 문항에 응답해 주세요.</div></div>';
+  }
+
+  // 여러 개·순위 문항을 고친 뒤 그 문항만 다시 그린다 (스크롤 위치 유지)
+  function redrawChoice(b) {
+    var old = document.getElementById('b-' + b.id); if (!old) return null;
+    var tmp = document.createElement('div'); tmp.innerHTML = choiceHTML(b, +old.dataset.n || 1);
+    var nu = tmp.firstChild; old.replaceWith(nu);
+    return nu;
   }
 
   /* ───── 이벤트 ───── */
   app.addEventListener('change', function (e) {
-    var t = e.target, n = t.name || '', p = n.split(':');
+    var t = e.target, p = (t.name || '').split(':');
     var from = t.closest('[data-unit]'); // 방금 답한 문항 (다음 문항으로 자동 스크롤할 기준)
-    if (p[0] === 'demo') {
-      A.demo[p[1]] = t.value;
-      var d = cfg.demographics.filter(function (x) { return x.id === p[1]; })[0];
-      if (d && d.other) {
-        render(); from = document.getElementById('d-' + p[1]);
-        if (t.value === '__other') { var oi = app.querySelector('[data-other="' + p[1] + '"]'); if (oi) oi.focus(); from = null; } // 기타 입력 중에는 이동하지 않음
+    var b = p.length > 1 ? findBlock(p[1]) : null;
+    if (!b) return;
+    if (p[0] === 'ch' && chMode(b) === 'multi') {
+      var list = chList(b).slice(), k = chK(b);
+      if (t.checked && list.length >= k) { t.checked = false; toast('최대 ' + k + '개까지 고를 수 있어요.'); return; }
+      if (t.checked) list.push(t.value); else list.splice(list.indexOf(t.value), 1);
+      var order = b.options.concat(['__other']); // 화면에 보이는 선택지 순서로 저장
+      A.ans[b.id] = list.sort(function (x, y) { return order.indexOf(x) - order.indexOf(y); });
+      from = null;
+      if (t.value === '__other') {
+        var q = redrawChoice(b);
+        if (t.checked) { var oin = q && q.querySelector('.other-in'); if (oin) oin.focus(); }
+      } else if (list.length === k && k < chAll(b)) from = redrawChoice(b); // 다 골랐으면 다음 문항으로
+      else { var qq = document.getElementById('b-' + b.id); if (qq) qq.dataset.done = chDone(b) ? '1' : ''; }
+    } else if (p[0] === 'ch') {
+      A.ans[b.id] = t.value;
+      if (b.other) {
+        var nq = redrawChoice(b); from = nq;
+        if (t.value === '__other') { var oi = nq && nq.querySelector('.other-in'); if (oi) oi.focus(); from = null; } // 기타 입력 중에는 이동하지 않음
       }
-    } else if (p[0] === 'ov') {
-      A.overall[+p[1]] = +t.value;
+    } else if (p[0] === 'sc') {
+      A.ans[b.id][+p[2]] = +t.value;
     } else if (p[0] === 'pick') {
-      A.slots[p[1]].choice = +t.value;
-      var card = document.getElementById('s-' + p[1]);
-      var tmp = document.createElement('div'); tmp.innerHTML = slotCard(cfg.slots.filter(function (s) { return s.id === p[1]; })[0]);
+      A.ans[b.id][p[2]].choice = +t.value;
+      var card = document.getElementById('s-' + p[2]);
+      var tmp = document.createElement('div'); tmp.innerHTML = slotCard(b, b.slots.filter(function (s) { return s.id === p[2]; })[0]);
       card.replaceWith(tmp.firstChild);
-      var first = document.querySelector('#s-' + CSS.escape(p[1]) + ' .scale input'); if (first) first.focus({ preventScroll: true });
-      from = document.querySelector('#s-' + CSS.escape(p[1]) + ' .pick');
+      var first = document.querySelector('#s-' + CSS.escape(p[2]) + ' .scale input'); if (first) first.focus({ preventScroll: true });
+      from = document.querySelector('#s-' + CSS.escape(p[2]) + ' .pick');
     } else if (p[0] === 'sl') {
-      A.slots[p[1]].scores[p.slice(2).join(':')] = +t.value;
+      A.ans[b.id][p[2]].scores[p.slice(3).join(':')] = +t.value;
     }
-    clearMissing(t);
+    clearMissing(from || t);
     saveDraft(); updateProgress();
     if (from) autoAdvance(from);
   });
@@ -453,7 +520,8 @@
     for (var k = i + 1; k < units.length; k++) {
       var u = units[k];
       if (u.querySelector('input:disabled')) continue;
-      if (!u.querySelector('input:checked')) { next = u; break; }
+      var answered = u.dataset.kind ? u.dataset.done === '1' : !!u.querySelector('input:checked');
+      if (!answered) { next = u; break; }
     }
     if (!next) return;
     clearTimeout(autoAdvance._t);
@@ -470,43 +538,62 @@
   }
   app.addEventListener('input', function (e) {
     var t = e.target;
-    if (t.dataset.other) { A.other[t.dataset.other] = t.value; clearMissing(t); }
-    if (t.dataset.open) { A.open[t.dataset.open] = t.value; clearMissing(t); }
+    if (t.dataset.other) {
+      A.other[t.dataset.other] = t.value;
+      var ob = findBlock(t.dataset.other), oq = t.closest('.q');
+      if (ob && oq && oq.dataset.kind) oq.dataset.done = chDone(ob) ? '1' : '';
+      clearMissing(t);
+    }
+    if (t.dataset.text) { A.ans[t.dataset.text] = t.value; clearMissing(t); }
     saveDraft(); updateProgress();
   });
   app.addEventListener('click', function (e) {
     var t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.rank) { rankTap(t.dataset.rank, t.dataset.v); return; }
     if (t.id === 'next') go(step + 1, true);
     else if (t.id === 'prev') go(step - 1, false);
     else if (t.id === 'submit') submit();
     else if (t.dataset.step != null) { var to = +t.dataset.step; go(to, to > step); }
   });
 
+  // 순위: 누르면 맨 뒤 순위로 들어가고, 이미 들어간 것을 누르면 빠진다(뒤 순위가 하나씩 당겨짐)
+  function rankTap(id, val) {
+    var b = findBlock(id); if (!b) return;
+    var list = chList(b).slice(), i = list.indexOf(val), k = chK(b);
+    if (i >= 0) list.splice(i, 1);
+    else if (list.length >= k) { toast(k + '순위까지 매겼어요. 바꾸려면 이미 고른 것을 눌러 빼 주세요.'); return; }
+    else list.push(val);
+    A.ans[id] = list;
+    var q = redrawChoice(b); if (!q) return;
+    var btn = q.querySelector('[data-v="' + CSS.escape(val) + '"]'); if (btn) btn.focus({ preventScroll: true });
+    if (val === '__other' && i < 0) { var oin = q.querySelector('.other-in'); if (oin) oin.focus(); }
+    clearMissing(q);
+    saveDraft(); updateProgress();
+    if (list.length === k && chDone(b)) autoAdvance(q);
+  }
+
   function clearMissing(t) {
-    var q = t.closest('.q.missing, .card.missing');
+    var q = t && t.closest && t.closest('.q.missing, .card.missing');
     if (!q) return;
-    var r = requiredList()[step].filter(function (x) { return x.id === q.id; })[0];
+    var r = requiredList(step).filter(function (x) { return x.id === q.id; })[0];
     if (!r || r.ok) q.classList.remove('missing');
   }
 
   function markMissing(i) {
-    var miss = requiredList()[i].filter(function (r) { return !r.ok; });
+    var miss = requiredList(i).filter(function (r) { return !r.ok; });
     miss.forEach(function (r) { var el = document.getElementById(r.id); if (el) el.classList.add('missing'); });
     if (miss.length) {
       var el = document.getElementById(miss[0].id);
-      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); var inp = el.querySelector('input:not(:disabled), textarea'); if (inp) setTimeout(function () { inp.focus({ preventScroll: true }); }, 300); }
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); var inp = el.querySelector('input:not(:disabled), textarea, button'); if (inp) setTimeout(function () { inp.focus({ preventScroll: true }); }, 300); }
       toast('응답하지 않은 필수 문항이 ' + miss.length + '개 있어요.');
     }
     return miss.length;
   }
 
   function go(to, validate) {
-    var act = active(), dir = to > step ? 1 : -1;
-    while (to >= 0 && to <= 3 && !act[to]) to += dir; // 문항 없는 단계는 건너뜀
-    if (to < 0 || to > 3 || to === step) return;
+    if (to < 0 || to > lastStep() || to === step) return;
     if (validate) {
       for (var i = step; i < to; i++) {
-        if (!act[i]) continue;
         if (i !== step) { step = i; render(); }
         if (markMissing(i)) return;
       }
@@ -520,16 +607,19 @@
   }
 
   function submit() {
-    var L = requiredList();
-    for (var i = 0; i < 4; i++) {
+    var L = requiredAll();
+    for (var i = 0; i < L.length; i++) {
       if (L[i].some(function (r) { return !r.ok; })) { step = i; render(); markMissing(i); return; }
     }
-    var demo = {}, other = {};
-    cfg.demographics.forEach(function (d) {
-      if (A.demo[d.id] === '__other') { demo[d.id] = '기타'; other[d.id] = A.other[d.id].trim(); }
-      else demo[d.id] = A.demo[d.id];
+    var ans = {}, other = {};
+    eachBlock(function (b) {
+      var v = A.ans[b.id];
+      if (b.type === 'choice') {
+        ans[b.id] = Array.isArray(v) ? v.map(function (x) { return x === '__other' ? '기타' : x; }) : v === '__other' ? '기타' : v;
+        if (chHasOther(b)) other[b.id] = String(A.other[b.id] || '').trim();
+      } else if (v != null) ans[b.id] = v;
     });
-    var payload = { demo: demo, other: other, overall: A.overall, slots: A.slots, open: A.open };
+    var payload = { v: 2, ans: ans, other: other };
     var btn = document.getElementById('submit'); btn.disabled = true; btn.textContent = '제출 중…';
     // 이 제출의 응답ID·수정키 (재시도·새로고침 후 다시 눌러도 같은 값 → 서버에 한 번만 저장)
     var client = null;
@@ -561,12 +651,12 @@
     // 주의: 스크립트 안에 SVG 태그를 직접 쓰면 Apps Script에서 페이지가 깨짐 → 체크 표시는 CSS 배경으로
     var rec = doneRecord();
     app.innerHTML = '<div class="center"><div class="big-check"></div>' +
-      '<h2>' + (again ? '이미 제출하셨어요' : edited ? '수정 완료!' : '제출 완료!') + '</h2><p>' + esc(T('doneMsg')) + '<br>' + esc(cfg.course || '') + ' ' + esc(cfg.cohort) + ' 연수에 참여해 주셔서 고맙습니다.</p>' +
+      '<h2>' + (again ? '이미 제출하셨어요' : edited ? '수정 완료!' : '제출 완료!') + '</h2><p>' + esc(doneMsg()) + '<br>' + esc([cfg.course, cfg.cohort].filter(Boolean).join(' ')) + ' 연수에 참여해 주셔서 고맙습니다.</p>' +
       (rec ? '<button type="button" class="btn" id="edit-mine" style="max-width:260px">내 응답 수정하기</button><p class="edit-note">수정하면 기존 응답이 새 내용으로 바뀌어요.</p>' : '') + '</div>';
     var b = document.getElementById('edit-mine');
     if (b) b.onclick = function () {
       var r = doneRecord(); if (!r) return;
-      A = r.answers; EDIT = { id: r.id, token: r.token }; step = firstStep(); render(); window.scrollTo(0, 0);
+      A = adoptAnswers(r.answers); EDIT = { id: r.id, token: r.token }; step = 0; render(); window.scrollTo(0, 0);
     };
   }
 
@@ -601,6 +691,7 @@
         app.innerHTML = '<div class="center"><h2>마감된 설문이에요</h2><p>' + esc(cfg.title) + '<br>응답 기간이 끝났습니다. 참여해 주셔서 감사합니다.</p></div>';
         return;
       }
+      if (!cfg.sections.length) { app.innerHTML = '<div class="center"><h2>아직 문항이 없는 설문이에요</h2></div>'; return; }
       start();
     });
   }).catch(function (err) {
@@ -609,15 +700,10 @@
 
   function start() {
     if (store('svy-done-' + SID)) return showDone(true);
-    A = emptyAnswers();
-    try {
-      var d = JSON.parse(store(draftKey()) || 'null');
-      if (d && d.overall && d.overall.length === A.overall.length) {
-        A.demo = d.demo || {}; A.other = d.other || {}; A.overall = d.overall; A.open = d.open || {};
-        cfg.slots.forEach(function (s) { if (d.slots && d.slots[s.id] && (d.slots[s.id].choice == null || s.options[d.slots[s.id].choice])) A.slots[s.id] = d.slots[s.id]; });
-      }
-    } catch (e) { /* 저장된 임시 응답 무시 */ }
-    step = firstStep();
+    var d = null;
+    try { d = JSON.parse(store(draftKey()) || 'null'); } catch (e) { d = null; }
+    A = adoptAnswers(d);
+    step = 0;
     render();
   }
 })();

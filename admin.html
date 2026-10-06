@@ -102,6 +102,39 @@
   .tt th { background: none; }
   .tt .grp { width: 80px; }
   .tt tr.split td { background: #fff8e6; }
+  /* 섹션·문항 블록 편집 */
+  .sb-sec { border: 1.5px solid #c9d8ee; background: #f7faff; }
+  .sb-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .sb-no { font-size: 12px; font-weight: 700; color: #fff; background: var(--accent); border-radius: 6px; padding: 2px 8px; flex: none; }
+  .sb-title { flex: 1; min-width: 200px; font-size: 16px; font-weight: 700; padding: 7px 10px; border: 1px solid var(--axis); border-radius: 8px; background: #fff; }
+  .sb-desc { width: 100%; margin: 8px 0 4px; padding: 7px 10px; border: 1px solid var(--grid); border-radius: 8px; background: #fff; font-size: 13.5px; resize: vertical; }
+  .sb-tools { display: flex; gap: 4px; margin-left: auto; }
+  .sb-tools .btn { min-width: 32px; }
+  .btn.danger { color: var(--danger); }
+  .sb-blk { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
+  .sb-blk .form { grid-template-columns: 130px 1fr; }
+  .sb-blk .form input[type=text], .sb-blk .form textarea { padding: 6px 9px; }
+  .sb-blk .form label { padding-top: 6px; }
+  .sb-bh { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .sb-type { font-size: 12px; font-weight: 700; border-radius: 6px; padding: 2px 8px; }
+  .sb-type.t-choice { color: #1c5cab; background: #e8f1fc; }
+  .sb-type.t-scale { color: #8a3f12; background: #fdebe1; }
+  .sb-type.t-timetable { color: #6b4a00; background: #fff1d1; }
+  .sb-type.t-text { color: #31593b; background: #e4f3e7; }
+  .sb-mode { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .sb-mode input[type=number] { width: 70px; padding: 6px 8px; border: 1px solid var(--axis); border-radius: 8px; }
+  label.sb-chk { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; padding-top: 6px; cursor: pointer; }
+  .sb-add { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--axis); }
+  .sb-add > span { font-size: 12.5px; color: var(--ink-2); font-weight: 600; margin-right: 4px; }
+  .sb-empty { color: var(--ink-3); font-size: 13px; padding: 14px 4px; }
+  .sb-flash { animation: sbflash 1.2s; }
+  @keyframes sbflash { from { box-shadow: 0 0 0 3px #86b6ef; } to { box-shadow: 0 0 0 3px transparent; } }
+  .new-menu { margin-top: -4px; }
+  .minis .card.wide { grid-column: 1 / -1; }
+  .rank-tbl { margin-top: 8px; font-size: 12.5px; }
+  .rank-tbl th, .rank-tbl td { padding: 5px 8px; }
+  .qf-hint { font-weight: 400; color: #555; font-size: 11.5px; }
+  .qf-num { display: inline-block; width: 22px; height: 16px; border: 1px solid #555; border-radius: 3px; margin-right: 4px; vertical-align: -3px; }
   .x { border: 0; background: none; cursor: pointer; color: var(--ink-3); font-size: 18px; padding: 2px 8px; }
   .x:hover { color: var(--danger); }
 
@@ -128,6 +161,7 @@
     .grid2 { grid-template-columns: 1fr; }
     .form { grid-template-columns: 1fr; }
     .form label { padding-top: 0; }
+    .sb-blk .form { grid-template-columns: 1fr; }
   }
   /* 과목별 그래프 보기 선택 */
   .crv-bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 0 0 10px; }
@@ -406,7 +440,9 @@
     var nOpen = SURVEYS.filter(function (s) { return s.status === OPEN; }).length;
     var h = '<header class="top"><div class="wrap top-in"><h1>설문 관리</h1></div></header><div class="wrap">' +
       '<div class="toolbar"><div class="grow"><h2>설문 ' + SURVEYS.length + '개</h2><div class="sub">진행 중 ' + nOpen + '개 · 설문마다 결과 시트가 드라이브 「연수 설문」 폴더에 따로 만들어져요</div></div>' +
-      '<button class="btn" id="refresh">새로고침</button><button class="btn primary" id="new">새 설문 만들기</button></div>';
+      '<button class="btn" id="refresh">새로고침</button><button class="btn primary" id="new" aria-expanded="false">새 설문 만들기 ▾</button></div>' +
+      '<div class="card new-menu" id="new-menu" hidden><b>어떤 틀로 시작할까요?</b> <span class="muted">만든 뒤 설정에서 섹션·문항을 자유롭게 바꿀 수 있어요. 지난 기수 설문을 이어 쓰려면 목록의 [복사해서 새로]가 편해요.</span><div class="acts" style="margin-top:10px">' +
+      '<button class="btn" data-tpl="post">사후설문 기본형</button><button class="btn" data-tpl="pre">사전설문 기본형</button><button class="btn" data-tpl="blank">빈 설문</button></div></div>';
     if (!SURVEYS.length) {
       h += '<div class="card empty">아직 만든 설문이 없어요.<br>[새 설문 만들기]를 누르거나, 다음 기수부터는 이전 설문을 [복사]해서 쓰면 돼요.</div>';
     } else {
@@ -426,7 +462,8 @@
     }
     root.innerHTML = h + '</div>';
     document.getElementById('refresh').onclick = loadList;
-    document.getElementById('new').onclick = function () { newSurvey(null, this); };
+    document.getElementById('new').onclick = function () { var m = document.getElementById('new-menu'); m.hidden = !m.hidden; this.setAttribute('aria-expanded', String(!m.hidden)); };
+    root.querySelectorAll('[data-tpl]').forEach(function (b) { b.onclick = function () { newSurvey(null, b, b.dataset.tpl); }; });
     root.querySelectorAll('[data-act]').forEach(function (b) {
       b.onclick = function () {
         var id = b.dataset.id, act = b.dataset.act;
@@ -438,9 +475,9 @@
     });
   }
 
-  function newSurvey(srcId, btn) {
+  function newSurvey(srcId, btn, tpl) {
     btn.disabled = true; btn.textContent = '만드는 중…';
-    api('createSurvey', KEY, srcId).then(function (r) {
+    api('createSurvey', KEY, srcId, tpl || null).then(function (r) {
       toast(srcId ? '복사했어요. 제목·기수·시간표를 고쳐 주세요.' : '새 설문을 만들었어요. 내용을 채워 주세요.');
       openSurvey(r.id, 'cfg');
     }).catch(function (e) { btn.disabled = false; toast(errMsg(e)); renderList(); });
@@ -473,6 +510,7 @@
   }
 
   /* ───── 데이터 가공 ───── */
+  // 설정 = 섹션 → 문항 블록(choice 객관식 / scale 척도 묶음 / timetable 시간표 과목평가 / text 서술형). 결과도 이 순서대로 보여 준다.
   function objs(t) { return t.rows.map(function (r) { var o = {}; t.headers.forEach(function (h, i) { o[h] = r[i]; }); return o; }); }
   function cohorts() { var s = []; objs(D.resp).forEach(function (o) { if (o['기수'] && s.indexOf(o['기수']) < 0) s.push(o['기수']); }); return s; }
 
@@ -480,70 +518,96 @@
     var n = 0, sum = 0; cnt.forEach(function (c, i) { n += c; sum += c * (i + 1); });
     return { counts: cnt, n: n, mean: n ? sum / n : NaN, top2: n ? (cnt[3] + cnt[4]) / n : NaN };
   }
+  function pickK(b) { var all = b.options.length + (b.other ? 1 : 0), m = parseInt(b.max, 10); return m >= 1 ? Math.min(m, all) : all; }
 
   function compute(ch) {
+    var c = D.config;
     var resp = objs(D.resp).filter(function (o) { return o['기수'] === ch; });
     var sc = objs(D.scores).filter(function (o) { return o['기수'] === ch; });
-    var S = { n: resp.length, overall: [], itemKeys: [], courses: [], demo: [], open: [], lblOverall: [], lblSession: [] };
-
-    var ov = {}, ovOrder = [], crs = {}, pos = {}, seenPerResp = {};
-    sc.forEach(function (o) {
-      var v = parseInt(o['점수'], 10); if (!(v >= 1 && v <= 5)) return;
-      if (o['영역'] === '과정만족도') {
-        if (!ov[o['문항']]) { ov[o['문항']] = [0, 0, 0, 0, 0]; ovOrder.push(o['문항']); }
-        ov[o['문항']][v - 1]++;
-        S.lblOverall[v - 1] = o['응답'];
-      } else if (o['영역'] === '과목평가') {
-        var key = [o['일자'], o['시간'], o['과목'], o['강사']].join('|');
-        if (S.itemKeys.indexOf(o['문항']) < 0) S.itemKeys.push(o['문항']);
-        var k = seenPerResp[o['응답ID']] = (seenPerResp[o['응답ID']] || 0) + 1;
-        if (!crs[key]) { crs[key] = { date: o['일자'], time: o['시간'], title: o['과목'], inst: o['강사'], split: o['분반수업'] === 'Y', by: {}, pos: 1e9 }; }
-        crs[key].pos = Math.min(crs[key].pos, Math.floor((k - 1) / Math.max(1, S.itemKeys.length)));
-        var b = crs[key].by[o['문항']] = crs[key].by[o['문항']] || [0, 0, 0, 0, 0];
-        b[v - 1]++;
-        S.lblSession[v - 1] = o['응답'];
-      }
+    var S = { n: resp.length, resp: resp, scores: sc, res: {}, scaleRes: [], courses: [], itemKeys: [], tt: null, open: [] };
+    var byArea = {};
+    sc.forEach(function (o) { (byArea[o['영역']] = byArea[o['영역']] || []).push(o); });
+    var junk = /^(없음|없습니다|없어요|무|x|-|\.|해당없음|해당 없음|특별히 없음|딱히 없음)\.?$/i;
+    c.sections.forEach(function (sec) {
+      sec.blocks.forEach(function (b) {
+        if (b.type === 'choice') S.res[b.id] = choiceResult(b, resp);
+        else if (b.type === 'scale') { var R = scaleResult(b, byArea[b.area] || [], sec); S.res[b.id] = R; S.scaleRes.push(R); }
+        else if (b.type === 'timetable') { S.tt = b; courseResult(S, b, byArea[b.area || '과목평가'] || []); S.res[b.id] = { b: b }; }
+        else if (b.type === 'text') {
+          var all = resp.map(function (o) { return { id: o['응답ID'], text: String(o[b.short] || '').trim() }; }).filter(function (a) { return a.text; });
+          var T = { b: b, q: b.short, text: b.text, answers: all.filter(function (a) { return !junk.test(a.text); }), skipped: all.filter(function (a) { return junk.test(a.text); }).length };
+          S.res[b.id] = T; S.open.push(T);
+        }
+      });
     });
-    S.overall = ovOrder.map(function (q) { var s = summarize(ov[q]); s.item = q; return s; });
+    return S;
+  }
+
+  // 객관식: 하나 = 선택 수 / 여러 개 = 선택 수(응답자 대비 비율) / 순위 = 순위별 인원 + 가중 점수(1순위 K점 … K순위 1점)
+  function choiceResult(b, resp) {
+    var mode = b.mode || 'single', K = pickK(b), m = {}, rows = {}, base = 0;
+    var order = b.options.concat(['기타']);
+    var idx = function (v) { var i = order.indexOf(v); return i < 0 ? 999 : i; };
+    var row = function (p) { if (!rows[p]) { rows[p] = { opt: p, r: [], score: 0 }; for (var i = 0; i < K; i++) rows[p].r[i] = 0; } return rows[p]; };
+    resp.forEach(function (o) {
+      var raw = String(o[b.label] || '').trim(); if (!raw) return;
+      base++;
+      if (mode === 'single') { m[raw] = (m[raw] || 0) + 1; return; }
+      raw.split(mode === 'rank' ? ' > ' : ' | ').forEach(function (p, r) {
+        p = p.trim(); if (!p) return;
+        m[p] = (m[p] || 0) + 1;
+        if (mode === 'rank' && r < K) { var x = row(p); x.r[r]++; x.score += K - r; }
+      });
+    });
+    // 아무도 고르지 않은 선택지도 0으로 보여 준다
+    b.options.concat(b.other ? ['기타'] : []).forEach(function (o) { if (!m[o]) m[o] = 0; if (mode === 'rank') row(o); });
+    var R = { b: b, mode: mode, base: base, K: K };
+    if (mode === 'rank') {
+      R.rows = Object.keys(rows).map(function (k) { return rows[k]; }).sort(function (a, z) { return z.score - a.score || z.r[0] - a.r[0] || idx(a.opt) - idx(z.opt); });
+      R.entries = R.rows.map(function (x) { return [x.opt, x.score]; });
+    } else {
+      R.entries = Object.keys(m).map(function (k) { return [k, m[k]]; }).sort(function (a, z) { return idx(a[0]) - idx(z[0]) || z[1] - a[1]; });
+    }
+    return R;
+  }
+  function rateOf(R, v) { return R.base ? (v / R.base * 100).toFixed(1) + '%' : '–'; }
+
+  function scaleResult(b, rows, sec) {
+    var cnt = {};
+    rows.forEach(function (o) { var v = parseInt(o['점수'], 10); if (!(v >= 1 && v <= 5)) return; (cnt[o['문항']] = cnt[o['문항']] || [0, 0, 0, 0, 0])[v - 1]++; });
+    var items = b.items.map(function (it) { var s = summarize(cnt[it.short] || [0, 0, 0, 0, 0]); s.item = it.short; s.text = it.text; return s; }).filter(function (s) { return s.n > 0; });
+    var all = summarize([0, 1, 2, 3, 4].map(function (i) { return items.reduce(function (a, s) { return a + s.counts[i]; }, 0); }));
+    return { b: b, name: b.title || sec.title, items: items, all: all, labels: b.labels, pos: b.posName || '만족 비율' };
+  }
+
+  function courseResult(S, b, rows) {
+    var crs = {}, seenPerResp = {}, keys = [];
+    rows.forEach(function (o) {
+      var v = parseInt(o['점수'], 10); if (!(v >= 1 && v <= 5)) return;
+      var key = [o['일자'], o['시간'], o['과목'], o['강사']].join('|');
+      if (keys.indexOf(o['문항']) < 0) keys.push(o['문항']);
+      var k = seenPerResp[o['응답ID']] = (seenPerResp[o['응답ID']] || 0) + 1;
+      if (!crs[key]) crs[key] = { date: o['일자'], time: o['시간'], title: o['과목'], inst: o['강사'], split: o['분반수업'] === 'Y', by: {}, pos: 1e9 };
+      crs[key].pos = Math.min(crs[key].pos, Math.floor((k - 1) / Math.max(1, keys.length)));
+      var bb = crs[key].by[o['문항']] = crs[key].by[o['문항']] || [0, 0, 0, 0, 0];
+      bb[v - 1]++;
+    });
+    var cfgKeys = b.items.map(function (i) { return i.key; });
+    S.itemKeys = cfgKeys.filter(function (k) { return keys.indexOf(k) >= 0; }).concat(keys.filter(function (k) { return cfgKeys.indexOf(k) < 0; }));
     S.courses = Object.keys(crs).map(function (k) {
-      var c = crs[k]; var by = {};
+      var c = crs[k], by = {};
       S.itemKeys.forEach(function (ik) { by[ik] = summarize(c.by[ik] || [0, 0, 0, 0, 0]); });
       c.by = by; c.n = by[S.itemKeys[0]] ? by[S.itemKeys[0]].n : 0; return c;
     });
-    // 현재 설정의 시간표에 있는 과목은 그 순서대로, 아니면 응답 순서대로
+    // 설정의 시간표에 있는 과목은 그 순서대로, 아니면 응답 순서대로
     var cfgOrder = {}, oi = 0;
-    (D.config.slots || []).forEach(function (s) { s.options.forEach(function (o) { cfgOrder[s.date + '|' + s.time + '|' + o.title + '|' + o.instructor] = oi++; }); });
+    (b.slots || []).forEach(function (s) { s.options.forEach(function (o) { cfgOrder[s.date + '|' + s.time + '|' + o.title + '|' + o.instructor] = oi++; }); });
     S.courses.forEach(function (c) { var k = [c.date, c.time, c.title, c.inst].join('|'); c.ord = k in cfgOrder ? cfgOrder[k] : 1000 + c.pos; });
-    S.courses.sort(function (a, b) { return a.ord - b.ord || a.pos - b.pos || (a.title > b.title ? 1 : -1); });
+    S.courses.sort(function (a, z) { return a.ord - z.ord || a.pos - z.pos || (a.title > z.title ? 1 : -1); });
     S.courses.forEach(function (c, i) { c.pos = i; });
-
-    // 기본정보: 기수 다음 열부터 첫 "[과정]" 열 전까지
-    // 응답자 정보 열 = 설정의 기본 정보 문항 (없으면 예전 방식: 기수 다음 ~ 첫 [과정] 열 전)
-    var H = D.resp.headers, demoCols = (D.config.demographics || []).map(function (d) { return d.label; }).filter(function (l) { return H.indexOf(l) >= 0; });
-    if (!demoCols.length && (D.config.demographics || []).length) { var i0 = H.indexOf('기수') + 1, i1 = H.findIndex(function (h) { return h.indexOf('[과정]') === 0; }); demoCols = H.slice(i0, i1 < 0 ? i0 : i1); }
-    demoCols.filter(function (h) { return !/\(기타 입력\)$/.test(h); }).forEach(function (h) {
-      var m = {}; resp.forEach(function (o) { var v = o[h]; if (v) m[v] = (m[v] || 0) + 1; });
-      var entries = Object.keys(m).map(function (k) { return [k, m[k]]; });
-      if (entries.length) S.demo.push({ label: h, entries: entries });
-    });
-    // 설정의 선택지 순서대로 정렬
-    S.demo.forEach(function (d) {
-      var def = (D.config.demographics || []).filter(function (x) { return x.label === d.label; })[0];
-      var order = def ? def.options : [];
-      d.entries.sort(function (a, b) {
-        var ia = order.indexOf(a[0]), ib = order.indexOf(b[0]);
-        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || b[1] - a[1];
-      });
-    });
-
-    var junk = /^(없음|없습니다|없어요|무|x|-|\.|해당없음|해당 없음|특별히 없음|딱히 없음)\.?$/i;
-    (D.config.open || []).forEach(function (q) {
-      if (H.indexOf(q.short) < 0) return;
-      var all = resp.map(function (o) { return { id: o['응답ID'], text: String(o[q.short] || '').trim() }; }).filter(function (a) { return a.text; });
-      S.open.push({ q: q.short, text: q.text, answers: all.filter(function (a) { return !junk.test(a.text); }), skipped: all.filter(function (a) { return junk.test(a.text); }).length });
-    });
-    S.resp = resp; S.scores = sc;
-    return S;
+  }
+  function courseAgg(S) {
+    return S.itemKeys.map(function (k) { return { k: k, s: summarize([0, 1, 2, 3, 4].map(function (i) { return S.courses.reduce(function (a, c) { return a + c.by[k].counts[i]; }, 0); })) }; });
   }
 
   /* ───── 화면 ───── */
@@ -584,57 +648,63 @@
   function legendHTML(items) { return '<div class="legend">' + items.map(function (it) { return '<span><i style="background:' + it[1] + '"></i>' + esc(it[0]) + '</span>'; }).join('') + '</div>'; }
 
   function renderDash(body, cs) {
-    var S = compute(cohort);
-    var first = S.overall[0], allOv = summarize([0, 1, 2, 3, 4].map(function (i) { return S.overall.reduce(function (a, o) { return a + o.counts[i]; }, 0); }));
-    var itemAgg = S.itemKeys.map(function (k) { return { k: k, s: summarize([0, 1, 2, 3, 4].map(function (i) { return S.courses.reduce(function (a, c) { return a + c.by[k].counts[i]; }, 0); })) }; });
-
-    var h = '<div class="toolbar"><div class="grow"><h2>' + esc(cohort) + ' 결과</h2><div class="sub">응답 ' + S.n + '명 · 점수는 5점 만점 평균, ' + esc(txt(D.config, 'posName')) + '은 4~5점 응답 비율</div></div>' +
-      (cs.length > 1 ? '<select id="cohort" aria-label="기수 선택">' + cs.map(function (c) { return '<option' + (c === cohort ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select>' : '') +
+    var S = compute(cohort), c = D.config, agg = courseAgg(S);
+    var h = '<div class="toolbar"><div class="grow"><h2>' + esc(cohort) + ' 결과</h2><div class="sub">응답 ' + S.n + '명 · 점수는 5점 만점 평균, 비율은 4~5점 응답 비율</div></div>' +
+      (cs.length > 1 ? '<select id="cohort" aria-label="기수 선택">' + cs.map(function (x) { return '<option' + (x === cohort ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select>' : '') +
       '<button class="btn" id="reload">새로고침</button><button class="btn" id="qform">설문지 PDF</button><button class="btn" id="print">보고서 PDF</button><button class="btn primary" id="xlsx">엑셀 다운로드</button></div>';
 
-    h += '<div class="kpis">' +
-      kpi('응답자', S.n, '명', '') +
-      (first ? kpi(first.item, f2(first.mean), '/ 5', txt(D.config, 'posName') + ' ' + pct(first.top2)) : '') +
-      (S.overall.length ? kpi(txt(D.config, 'overallTitle') + ' 평균', f2(allOv.mean), '/ 5', S.overall.length + '개 지표 · ' + txt(D.config, 'posName') + ' ' + pct(allOv.top2)) : '') +
-      itemAgg.map(function (a) { return kpi('과목 ' + a.k + ' 평균', f2(a.s.mean), '/ 5', S.courses.length + '개 과목 · 만족 비율 ' + pct(a.s.top2)); }).join('') + '</div>';
+    var sr = S.scaleRes.filter(function (R) { return R.items.length; });
+    h += '<div class="kpis">' + kpi('응답자', S.n, '명', '') +
+      (sr[0] ? kpi(sr[0].items[0].item, f2(sr[0].items[0].mean), '/ 5', sr[0].pos + ' ' + pct(sr[0].items[0].top2)) : '') +
+      sr.map(function (R) { return kpi(R.name + ' 평균', f2(R.all.mean), '/ 5', R.items.length + '개 지표 · ' + R.pos + ' ' + pct(R.all.top2)); }).join('') +
+      agg.map(function (a) { return kpi('과목 ' + a.k + ' 평균', f2(a.s.mean), '/ 5', S.courses.length + '개 과목 · 만족 비율 ' + pct(a.s.top2)); }).join('') + '</div>';
 
-    // 설정에서 뺀 단계(문항 0개)는 결과 화면에서도 숨긴다
-    if (S.overall.length) {
-    h += '<div class="sec">' + esc(txt(D.config, 'overallTitle')) + '</div>';
-    h += chartCard('c-ov', txt(D.config, 'overallTitle') + ' 지표별 응답 분포', '막대 길이 = 응답 비율, 괄호 = 평균 점수', 46 + S.overall.length * 40,
-      legendHTML(LIK.map(function (c, i) { return [(i + 1) + '점 ' + (S.lblOverall[i] || ''), c]; })));
-    h += '<div class="minis">' + S.overall.map(function (o, i) {
-      return '<div class="card"><div class="card-h"><div><h4>' + esc(o.item) + '</h4><div class="m">평균 ' + f2(o.mean) + ' · ' + esc(txt(D.config, 'posName')) + ' ' + pct(o.top2) + ' · ' + o.n + '명</div></div>' +
-        '<div class="act"><button class="btn sm" data-png="c-m' + i + '" data-name="' + esc(o.item) + '">저장</button></div></div><div class="chart-box" style="height:150px"><canvas id="c-m' + i + '" role="img" aria-label="' + esc(o.item) + ' 응답 분포"></canvas></div></div>';
-    }).join('') + '</div>';
-    }
-
-    if (S.courses.length) {
-    h += '<div class="sec">' + esc(txt(D.config, 'slotsTitle')) + '</div>';
-    var seg = function (key, opts) { return '<div class="seg" role="group">' + opts.map(function (o) { return '<button type="button" class="seg-b" data-crv="' + key + ':' + o[0] + '">' + esc(o[1]) + '</button>'; }).join('') + '</div>'; };
-    h += chartCard('c-cr', '과목별 평균 점수', '1~5점 척도 · 분반 과목은 해당 분반 수강자만 응답 · 점수순으로 보면 순위가 붙어요', 60 + S.courses.length * 42,
-      '<div class="crv-bar">' +
-      seg('metric', [['both', S.itemKeys.join('+')]].concat(S.itemKeys.map(function (k, i) { return [String(i), k]; }))) +
-      seg('sort', [['pos', '시간표순'], ['desc', '점수 높은 순'], ['asc', '점수 낮은 순']]) +
-      '<div class="legend" id="cr-legend" style="margin:0"></div></div>');
-    h += '<div class="card"><div class="card-h"><div><h3>과목별 상세</h3><div class="d">시간표 순서 · 열 제목을 누르면 정렬</div></div></div><div class="tbl-wrap"><table id="crs-tbl"><thead><tr>' +
-      '<th data-sort="pos">일자</th><th>시간</th><th data-sort="title">과목</th><th>강사</th><th class="num" data-sort="n">응답</th>' +
-      S.itemKeys.map(function (k, i) { return '<th class="num" data-sort="m' + i + '">' + esc(k) + ' 평균</th><th class="num" data-sort="t' + i + '">' + esc(k) + ' 만족 비율</th>'; }).join('') +
-      '</tr></thead><tbody></tbody></table></div></div>';
-    }
-
-    if (S.demo.length) h += '<div class="sec">응답자 구성</div><div class="minis">' + S.demo.map(function (d, i) {
-      return '<div class="card"><div class="card-h"><div><h4>' + esc(d.label) + '</h4></div><div class="act"><button class="btn sm" data-png="c-d' + i + '" data-name="' + esc(d.label) + '">저장</button></div></div>' +
-        '<div class="chart-box" style="height:' + (30 + d.entries.length * 30) + 'px"><canvas id="c-d' + i + '" role="img" aria-label="' + esc(d.label) + ' 구성"></canvas></div></div>';
-    }).join('') + '</div>';
-
-    if (S.open.length) h += '<div class="sec">' + esc(txt(D.config, 'openTitle')) + '</div><div class="grid2">' + S.open.map(function (q) {
-      return '<div class="card open-q"><div class="card-h"><div><h3>' + esc(q.q) + ' <span class="muted" style="font-weight:500">' + q.answers.length + '건</span></h3>' +
-        (q.skipped ? '<div class="d">"없음" 등 ' + q.skipped + '건 제외</div>' : '') + '</div></div>' +
-        (q.answers.length ? '<ul class="open-list">' + q.answers.map(function (a) { return '<li>' + esc(a.text) + '</li>'; }).join('') + '</ul>' : '<div class="muted">응답 없음</div>') + '</div>';
-    }).join('') + '</div>';
+    // 섹션 순서대로: 객관식은 작은 카드 묶음, 서술형은 두 칸, 척도·시간표는 넓은 카드
+    var draws = [], nCh = 0, nSc = 0;
+    c.sections.forEach(function (sec) {
+      var parts = '', pend = [], pendType = null;
+      var flush = function () {
+        if (pend.length) parts += '<div class="' + (pendType === 'choice' ? 'minis' : 'grid2') + '">' + pend.join('') + '</div>';
+        pend = []; pendType = null;
+      };
+      sec.blocks.forEach(function (b) {
+        var R = S.res[b.id];
+        if (b.type === 'choice') {
+          if (!R.base) return;
+          if (pendType !== 'choice') flush();
+          pendType = 'choice';
+          var cid = 'c-ch' + (nCh++);
+          pend.push(choiceCard(R, cid));
+          draws.push(function () { drawChoice(R, cid); });
+        } else if (b.type === 'text') {
+          if (pendType !== 'text') flush();
+          pendType = 'text';
+          pend.push(openCard(R));
+        } else if (b.type === 'scale') {
+          flush();
+          if (!R.items.length) return;
+          var sid = 'c-sc' + (nSc++);
+          parts += scaleCards(R, sid);
+          draws.push(function () { drawScale(R, sid); drawScaleMinis(R, sid); });
+        } else if (b.type === 'timetable') {
+          flush();
+          if (!S.courses.length) return;
+          parts += courseCards(S);
+          draws.push(function () {
+            if (CRV.metric !== 'both' && !S.itemKeys[+CRV.metric]) CRV.metric = 'both';
+            drawCourses(S); fillCourseTable(S, 'pos', 1);
+            body.querySelectorAll('[data-crv]').forEach(function (bt) { bt.onclick = function () { var p = bt.dataset.crv.split(':'); CRV[p[0]] = p[1]; drawCourses(S); }; });
+            body.querySelectorAll('#crs-tbl [data-sort]').forEach(function (th) {
+              th.style.cursor = 'pointer';
+              th.onclick = function () { var k = th.dataset.sort; var dir = fillCourseTable._k === k ? -fillCourseTable._d : (k === 'pos' || k === 'title' ? 1 : -1); fillCourseTable(S, k, dir); };
+            });
+          });
+        }
+      });
+      flush();
+      if (parts) h += '<div class="sec">' + esc(sec.title) + '</div>' + parts;
+    });
     h += '<div style="height:40px"></div>';
-
     body.innerHTML = h;
 
     var sel = document.getElementById('cohort'); if (sel) sel.onchange = function () { cohort = sel.value; render(); };
@@ -643,18 +713,107 @@
     document.getElementById('qform').onclick = openQuestionnaire;
     document.getElementById('xlsx').onclick = function () { exportXlsx(S); };
     body.querySelectorAll('[data-png]').forEach(function (b) { b.onclick = function () { savePng(b.dataset.png, b.dataset.name); }; });
+    draws.forEach(function (f) { f(); });
+  }
 
-    if (S.overall.length) { drawOverall(S); drawMinis(S); }
-    if (S.courses.length) {
-      if (CRV.metric !== 'both' && !S.itemKeys[+CRV.metric]) CRV.metric = 'both';
-      drawCourses(S); fillCourseTable(S, 'pos', 1);
-      body.querySelectorAll('[data-crv]').forEach(function (b) { b.onclick = function () { var p = b.dataset.crv.split(':'); CRV[p[0]] = p[1]; drawCourses(S); }; });
-    }
-    drawDemo(S);
-    body.querySelectorAll('#crs-tbl [data-sort]').forEach(function (th) {
-      th.style.cursor = 'pointer';
-      th.onclick = function () { var k = th.dataset.sort; var dir = fillCourseTable._k === k ? -fillCourseTable._d : (k === 'pos' || k === 'title' ? 1 : -1); fillCourseTable(S, k, dir); };
+  function choiceSub(R) {
+    if (R.mode === 'multi') return '복수 선택 · 응답자 ' + R.base + '명 · 비율은 응답자 대비';
+    if (R.mode === 'rank') return R.K + '순위까지 · 응답자 ' + R.base + '명 · 점수 = 1순위 ' + R.K + '점 … ' + R.K + '순위 1점';
+    return '응답 ' + R.base + '명';
+  }
+  function choiceCard(R, id) {
+    var h = '<div class="card' + (R.mode === 'rank' ? ' wide' : '') + '"><div class="card-h"><div><h4>' + esc(R.b.label) + '</h4><div class="m">' + esc(choiceSub(R)) + '</div></div>' +
+      '<div class="act"><button class="btn sm" data-png="' + id + '" data-name="' + esc(R.b.label) + '">저장</button></div></div>' +
+      '<div class="chart-box" style="height:' + (30 + R.entries.length * 30) + 'px"><canvas id="' + id + '" role="img" aria-label="' + esc(R.b.label) + ' 결과"></canvas></div>';
+    if (R.mode === 'rank') h += '<div class="tbl-wrap"><table class="rank-tbl"><thead><tr><th>순위</th><th>항목</th>' + R.rows[0].r.map(function (_, i) { return '<th class="num">' + (i + 1) + '순위</th>'; }).join('') + '<th class="num">점수</th></tr></thead><tbody>' +
+      R.rows.map(function (x, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc(x.opt) + '</td>' + x.r.map(function (v) { return '<td class="num">' + v + '</td>'; }).join('') + '<td class="num"><b>' + x.score + '</b></td></tr>'; }).join('') + '</tbody></table></div>';
+    return h + '</div>';
+  }
+  function choiceChartCfg(R, fixed) {
+    return {
+      type: 'bar',
+      data: { labels: R.entries.map(function (e) { return e[0]; }), datasets: [{ data: R.entries.map(function (e) { return e[1]; }), backgroundColor: R.mode === 'rank' ? SERIES[1] : SERIES[0], borderRadius: 4, borderSkipped: 'start', maxBarThickness: 20 }] },
+      options: {
+        indexAxis: 'y', maintainAspectRatio: false,
+        scales: { x: { beginAtZero: true, ticks: { precision: 0 }, title: { display: R.mode === 'rank', text: '가중 점수' }, grid: { color: '#e1e0d9' } }, y: { grid: { display: false }, ticks: { color: '#0b0b0b' } } },
+        plugins: { legend: { display: false }, tooltip: { enabled: !fixed, callbacks: { label: function (x) {
+          if (R.mode === 'rank') { var row = R.rows[x.dataIndex]; return ' ' + row.score + '점 (' + row.r.map(function (v, i) { return (i + 1) + '순위 ' + v + '명'; }).join(' · ') + ')'; }
+          return ' ' + x.parsed.x + '명 (' + (R.mode === 'multi' ? '응답자의 ' : '') + rateOf(R, x.parsed.x) + ')';
+        } } } }
+      },
+      plugins: [whiteBg, endLabelsInt]
+    };
+  }
+  function drawChoice(R, id) { charts.push(new Chart(document.getElementById(id), choiceChartCfg(R, false))); }
+  // 정수 값 막대 끝에 숫자 표시
+  var endLabelsInt = { id: 'endLabelsInt', afterDatasetsDraw: function (c) {
+    var x = c.ctx, area = c.chartArea; x.save(); x.font = '600 11px "Pretendard Variable", Pretendard, system-ui, sans-serif'; x.textBaseline = 'middle';
+    c.getDatasetMeta(0).data.forEach(function (bar, i) {
+      var s = String(c.data.datasets[0].data[i]), w = x.measureText(s).width;
+      if (bar.x + 6 + w <= area.right) { x.fillStyle = '#52514e'; x.textAlign = 'left'; x.fillText(s, bar.x + 5, bar.y); }
+      else { x.fillStyle = '#fff'; x.textAlign = 'right'; x.fillText(s, bar.x - 6, bar.y); }
     });
+    x.restore();
+  } };
+
+  function openCard(q) {
+    return '<div class="card open-q"><div class="card-h"><div><h3>' + esc(q.q) + ' <span class="muted" style="font-weight:500">' + q.answers.length + '건</span></h3>' +
+      (q.skipped ? '<div class="d">"없음" 등 ' + q.skipped + '건 제외</div>' : '') + '</div></div>' +
+      (q.answers.length ? '<ul class="open-list">' + q.answers.map(function (a) { return '<li>' + esc(a.text) + '</li>'; }).join('') + '</ul>' : '<div class="muted">응답 없음</div>') + '</div>';
+  }
+
+  function scaleCards(R, id) {
+    var h = chartCard(id, R.name + ' 지표별 응답 분포', '막대 길이 = 응답 비율, 괄호 = 평균 점수', 46 + R.items.length * 40,
+      legendHTML(LIK.map(function (col, i) { return [(i + 1) + '점 ' + (R.labels[i] || ''), col]; })));
+    return h + '<div class="minis">' + R.items.map(function (o, i) {
+      return '<div class="card"><div class="card-h"><div><h4>' + esc(o.item) + '</h4><div class="m">평균 ' + f2(o.mean) + ' · ' + esc(R.pos) + ' ' + pct(o.top2) + ' · ' + o.n + '명</div></div>' +
+        '<div class="act"><button class="btn sm" data-png="' + id + '-m' + i + '" data-name="' + esc(o.item) + '">저장</button></div></div><div class="chart-box" style="height:150px"><canvas id="' + id + '-m' + i + '" role="img" aria-label="' + esc(o.item) + ' 응답 분포"></canvas></div></div>';
+    }).join('') + '</div>';
+  }
+  function scaleChartCfg(R, fixed) {
+    return {
+      type: 'bar',
+      data: { labels: R.items.map(function (o) { return o.item + ' (' + f2(o.mean) + ')'; }), datasets: [0, 1, 2, 3, 4].map(function (i) {
+        return { label: (i + 1) + '점 ' + (R.labels[i] || ''), data: R.items.map(function (o) { return o.n ? o.counts[i] / o.n * 100 : 0; }), _cnt: R.items.map(function (o) { return o.counts[i]; }),
+          backgroundColor: LIK[i], borderColor: '#fff', borderWidth: { left: 1, right: 1 }, borderSkipped: false, barPercentage: .78, categoryPercentage: .9 };
+      }) },
+      options: {
+        indexAxis: 'y', maintainAspectRatio: false,
+        scales: { x: { stacked: true, max: 100, ticks: { callback: function (v) { return v + '%'; } }, grid: { color: '#e1e0d9' } }, y: { stacked: true, grid: { display: false }, ticks: { color: '#0b0b0b' } } },
+        plugins: fixed
+          ? { legend: { display: true, position: 'top', align: 'start', labels: { boxWidth: 10, boxHeight: 10, font: { size: 11 }, generateLabels: function () { return [0, 1, 2, 3, 4].map(function (i) { return { text: (i + 1) + '점 ' + (R.labels[i] || ''), fillStyle: LIK[i], strokeStyle: LIK[i], lineWidth: 0 }; }); } } }, tooltip: { enabled: false } }
+          : { legend: { display: false }, tooltip: { callbacks: { label: function (x) { return ' ' + x.dataset.label + ': ' + x.dataset._cnt[x.dataIndex] + '명 (' + x.parsed.x.toFixed(1) + '%)'; } } } }
+      },
+      plugins: [whiteBg]
+    };
+  }
+  function drawScale(R, id) { charts.push(new Chart(document.getElementById(id), scaleChartCfg(R, false))); }
+  function drawScaleMinis(R, id) {
+    R.items.forEach(function (o, i) {
+      charts.push(new Chart(document.getElementById(id + '-m' + i), {
+        type: 'bar',
+        data: { labels: [1, 2, 3, 4, 5].map(function (v) { return [String(v), R.labels[v - 1] || '']; }), datasets: [{ data: o.counts, backgroundColor: LIK, borderRadius: 4, borderSkipped: 'start', maxBarThickness: 34 }] },
+        options: {
+          maintainAspectRatio: false,
+          scales: { y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#e1e0d9' } }, x: { grid: { display: false }, ticks: { font: { size: 10.5 } } } },
+          plugins: { legend: { display: false }, tooltip: { callbacks: { title: function (x) { return x[0].label.replace(',', '점 '); }, label: function (x) { return ' ' + x.parsed.y + '명 (' + (o.n ? (x.parsed.y / o.n * 100).toFixed(1) : 0) + '%)'; } } } }
+        },
+        plugins: [whiteBg]
+      }));
+    });
+  }
+
+  function courseCards(S) {
+    var seg = function (key, opts) { return '<div class="seg" role="group">' + opts.map(function (o) { return '<button type="button" class="seg-b" data-crv="' + key + ':' + o[0] + '">' + esc(o[1]) + '</button>'; }).join('') + '</div>'; };
+    return chartCard('c-cr', '과목별 평균 점수', '1~5점 척도 · 분반 과목은 해당 분반 수강자만 응답 · 점수순으로 보면 순위가 붙어요', 60 + S.courses.length * 42,
+      '<div class="crv-bar">' +
+      seg('metric', [['both', S.itemKeys.join('+')]].concat(S.itemKeys.map(function (k, i) { return [String(i), k]; }))) +
+      seg('sort', [['pos', '시간표순'], ['desc', '점수 높은 순'], ['asc', '점수 낮은 순']]) +
+      '<div class="legend" id="cr-legend" style="margin:0"></div></div>') +
+      '<div class="card"><div class="card-h"><div><h3>과목별 상세</h3><div class="d">시간표 순서 · 열 제목을 누르면 정렬</div></div></div><div class="tbl-wrap"><table id="crs-tbl"><thead><tr>' +
+      '<th data-sort="pos">일자</th><th>시간</th><th data-sort="title">과목</th><th>강사</th><th class="num" data-sort="n">응답</th>' +
+      S.itemKeys.map(function (k, i) { return '<th class="num" data-sort="m' + i + '">' + esc(k) + ' 평균</th><th class="num" data-sort="t' + i + '">' + esc(k) + ' 만족 비율</th>'; }).join('') +
+      '</tr></thead><tbody></tbody></table></div></div>';
   }
 
   function kpi(k, v, unit, s) { return '<div class="kpi"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + '<small>' + esc(unit) + '</small></div>' + (s ? '<div class="s">' + esc(s) + '</div>' : '') + '</div>'; }
@@ -676,38 +835,6 @@
           return '<td class="num">' + f2(s.mean) + '<span class="cellbar' + (i ? ' b' : '') + '" style="width:' + Math.max(0, (s.mean - 1) / 4 * 50) + 'px"></span></td><td class="num">' + pct(s.top2) + '</td>';
         }).join('') + '</tr>';
     }).join('');
-  }
-
-  function drawOverall(S) {
-    var labels = S.overall.map(function (o) { return o.item + ' (' + f2(o.mean) + ')'; });
-    charts.push(new Chart(document.getElementById('c-ov'), {
-      type: 'bar',
-      data: { labels: labels, datasets: [0, 1, 2, 3, 4].map(function (i) {
-        return { label: (i + 1) + '점 ' + (S.lblOverall[i] || ''), data: S.overall.map(function (o) { return o.n ? o.counts[i] / o.n * 100 : 0; }), _cnt: S.overall.map(function (o) { return o.counts[i]; }),
-          backgroundColor: LIK[i], borderColor: '#fff', borderWidth: { left: 1, right: 1 }, borderSkipped: false, barPercentage: .78, categoryPercentage: .9 };
-      }) },
-      options: {
-        indexAxis: 'y', maintainAspectRatio: false,
-        scales: { x: { stacked: true, max: 100, ticks: { callback: function (v) { return v + '%'; } }, grid: { color: '#e1e0d9' } }, y: { stacked: true, grid: { display: false }, ticks: { color: '#0b0b0b' } } },
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return ' ' + c.dataset.label + ': ' + c.dataset._cnt[c.dataIndex] + '명 (' + c.parsed.x.toFixed(1) + '%)'; } } } }
-      },
-      plugins: [whiteBg]
-    }));
-  }
-
-  function drawMinis(S) {
-    S.overall.forEach(function (o, i) {
-      charts.push(new Chart(document.getElementById('c-m' + i), {
-        type: 'bar',
-        data: { labels: [1, 2, 3, 4, 5].map(function (v) { return [String(v), S.lblOverall[v - 1] || '']; }), datasets: [{ data: o.counts, backgroundColor: LIK, borderRadius: 4, borderSkipped: 'start', maxBarThickness: 34 }] },
-        options: {
-          maintainAspectRatio: false,
-          scales: { y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#e1e0d9' } }, x: { grid: { display: false }, ticks: { font: { size: 10.5 } } } },
-          plugins: { legend: { display: false }, tooltip: { callbacks: { title: function (c) { return c[0].label.replace(',', '점 '); }, label: function (c) { return ' ' + c.parsed.y + '명 (' + (o.n ? (c.parsed.y / o.n * 100).toFixed(1) : 0) + '%)'; } } } }
-        },
-        plugins: [whiteBg]
-      }));
-    });
   }
 
   /** 보기 방식(view)에 맞춘 과목 목록·지표 (대시보드와 보고서 공용) */
@@ -756,22 +883,6 @@
     document.querySelectorAll('[data-crv]').forEach(function (b) { var p = b.dataset.crv.split(':'); b.classList.toggle('on', String(CRV[p[0]]) === p[1]); });
   }
 
-  function drawDemo(S) {
-    S.demo.forEach(function (d, i) {
-      var tot = d.entries.reduce(function (a, e) { return a + e[1]; }, 0);
-      charts.push(new Chart(document.getElementById('c-d' + i), {
-        type: 'bar',
-        data: { labels: d.entries.map(function (e) { return e[0]; }), datasets: [{ data: d.entries.map(function (e) { return e[1]; }), backgroundColor: SERIES[0], borderRadius: 4, borderSkipped: 'start', maxBarThickness: 20 }] },
-        options: {
-          indexAxis: 'y', maintainAspectRatio: false,
-          scales: { x: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#e1e0d9' } }, y: { grid: { display: false }, ticks: { color: '#0b0b0b' } } },
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: function (c) { return ' ' + c.parsed.x + '명 (' + (c.parsed.x / tot * 100).toFixed(1) + '%)'; } } } }
-        },
-        plugins: [whiteBg]
-      }));
-    });
-  }
-
   function savePng(id, name) {
     var ch = charts.filter(function (c) { return c.canvas.id === id; })[0]; if (!ch) return;
     var a = document.createElement('a');
@@ -805,127 +916,120 @@
       rows.map(function (r) { return '<tr>' + r.map(function (v, i) { return '<td' + (numCols.indexOf(i) >= 0 ? ' class="num"' : '') + '>' + esc(v) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>';
   }
 
+
   function openReport(S) {
-    var c = D.config, today = new Date();
+    var c = D.config, today = new Date(), agg = courseAgg(S);
     var ymd = today.getFullYear() + '. ' + (today.getMonth() + 1) + '. ' + today.getDate() + '.';
-    var allOv = summarize([0, 1, 2, 3, 4].map(function (i) { return S.overall.reduce(function (a, o) { return a + o.counts[i]; }, 0); }));
-    var agg = S.itemKeys.map(function (k) { return { k: k, s: summarize([0, 1, 2, 3, 4].map(function (i) { return S.courses.reduce(function (a, x) { return a + x.by[k].counts[i]; }, 0); })) }; });
-    var h = '<header class="rp-head"><div class="rp-kicker">' + esc([c.course, cohort].filter(Boolean).join(' ')) + ' 사후설문 결과 보고</div>' +
+    var h = '<header class="rp-head"><div class="rp-kicker">' + esc([c.course, cohort].filter(Boolean).join(' ')) + ' 설문 결과 보고</div>' +
       '<h1>' + esc(c.title) + '</h1><div class="rp-meta">' + [c.period ? '연수 기간 ' + esc(c.period) : '', '응답자 ' + S.n + '명', '작성일 ' + ymd].filter(Boolean).join(' · ') + '</div></header>';
 
-    // 요약
-    var sum = [];
-    if (S.overall.length) {
-      sum.push([S.overall[0].item, f2(S.overall[0].mean), pct(S.overall[0].top2)]);
-      sum.push([txt(c, 'overallTitle') + ' 평균 (' + S.overall.length + '개 지표)', f2(allOv.mean), pct(allOv.top2)]);
-    }
+    // 요약: 척도 묶음 평균 + 과목 평가 평균
+    var sum = [], sr = S.scaleRes.filter(function (R) { return R.items.length; });
+    sr.forEach(function (R, i) {
+      if (i === 0) sum.push([R.items[0].item, f2(R.items[0].mean), pct(R.items[0].top2)]);
+      sum.push([R.name + ' 평균 (' + R.items.length + '개 지표)', f2(R.all.mean), pct(R.all.top2)]);
+    });
     agg.forEach(function (a) { sum.push(['과목 ' + a.k + ' 평균 (' + S.courses.length + '개 과목)', f2(a.s.mean), pct(a.s.top2)]); });
-    if (sum.length) h += '<section><h2>요약</h2>' + rpTable(['구분', '평균 (5점 만점)', txt(c, 'posName') + ' (4~5점)'], sum, [1, 2]) + '</section>';
+    if (sum.length) h += '<section><h2>요약</h2>' + rpTable(['구분', '평균 (5점 만점)', '4~5점 비율'], sum, [1, 2]) + '</section>';
 
-    // 과정 만족도
-    if (S.overall.length) {
-      var ovCfg = {
-        type: 'bar',
-        data: { labels: S.overall.map(function (o) { return o.item + ' (' + f2(o.mean) + ')'; }), datasets: [0, 1, 2, 3, 4].map(function (i) {
-          return { label: (i + 1) + '점', data: S.overall.map(function (o) { return o.n ? o.counts[i] / o.n * 100 : 0; }), backgroundColor: LIK[i], borderColor: '#fff', borderWidth: { left: 1, right: 1 }, borderSkipped: false, barPercentage: .78, categoryPercentage: .9 };
-        }) },
-        options: { indexAxis: 'y', scales: { x: { stacked: true, max: 100, ticks: { callback: function (v) { return v + '%'; } }, grid: { color: '#e1e0d9' } }, y: { stacked: true, grid: { display: false }, ticks: { color: '#0b0b0b' } } },
-          plugins: { legend: { display: true, position: 'top', align: 'start', labels: { boxWidth: 10, boxHeight: 10, font: { size: 11 }, generateLabels: function () { return [0, 1, 2, 3, 4].map(function (i) { return { text: (i + 1) + '점 ' + (S.lblOverall[i] || ''), fillStyle: LIK[i], strokeStyle: LIK[i], lineWidth: 0 }; }); } } }, tooltip: { enabled: false } } },
-        plugins: [whiteBg]
-      };
-      h += '<section><h2>' + esc(txt(c, 'overallTitle')) + '</h2>' +
-        rpFig(chartImg(ovCfg, RP_W, 70 + S.overall.length * 34), '지표별 응답 분포 (막대 길이 = 응답 비율, 괄호 = 평균)') +
-        rpTable(['지표', '평균', txt(c, 'posName'), '응답'].concat([5, 4, 3, 2, 1].map(function (v) { return v + '점'; })),
-          S.overall.map(function (o) { return [o.item, f2(o.mean), pct(o.top2), o.n].concat([4, 3, 2, 1, 0].map(function (i) { return o.counts[i]; })); }),
-          [1, 2, 3, 4, 5, 6, 7, 8]) + '</section>';
-    }
-
-    // 과목 평가: 지표별 점수 순위 + 시간표순 상세
-    if (S.courses.length) {
-      h += '<section><h2>' + esc(txt(c, 'slotsTitle')) + '</h2>';
-      S.itemKeys.forEach(function (k, i) {
-        var cfg = courseChartConfig(S, { metric: String(i), sort: 'desc' }, true);
-        h += '<h3>' + esc(k) + ' 점수 순위</h3>' + rpFig(chartImg(cfg, RP_W, cfg._height), k + ' 평균 점수가 높은 순 (1~5점)');
+    // 섹션 순서대로
+    c.sections.forEach(function (sec) {
+      var parts = '', small = [];
+      var flush = function () { if (small.length) { parts += '<div class="rp-demo">' + small.join('') + '</div>'; small = []; } };
+      sec.blocks.forEach(function (b) {
+        var R = S.res[b.id];
+        if (b.type === 'choice') {
+          if (!R.base) return;
+          if (R.mode === 'rank') {
+            flush();
+            parts += '<h3>' + esc(b.label) + ' <span class="rp-cnt">' + esc(choiceSub(R)) + '</span></h3>' +
+              rpFig(chartImg(choiceChartCfg(R, true), RP_W, 40 + R.entries.length * 26)) +
+              rpTable(['순위', '항목'].concat(R.rows[0].r.map(function (_, i) { return (i + 1) + '순위'; })).concat(['점수']),
+                R.rows.map(function (x, i) { return [i + 1, x.opt].concat(x.r).concat([x.score]); }), R.rows[0].r.map(function (_, i) { return i + 2; }).concat([R.K + 2]));
+          } else {
+            small.push('<div class="rp-demo-i"><h4>' + esc(b.label) + (R.mode === 'multi' ? ' <span class="rp-cnt">(복수 선택)</span>' : '') + '</h4>' +
+              rpTable(['구분', '명', R.mode === 'multi' ? '응답자 대비' : '비율'], R.entries.map(function (e) { return [e[0], e[1], rateOf(R, e[1])]; }), [1, 2]) + '</div>');
+          }
+          return;
+        }
+        flush();
+        if (b.type === 'scale') {
+          if (!R.items.length) return;
+          parts += (b.title ? '<h3>' + esc(b.title) + '</h3>' : '') +
+            rpFig(chartImg(scaleChartCfg(R, true), RP_W, 70 + R.items.length * 34), '지표별 응답 분포 (막대 길이 = 응답 비율, 괄호 = 평균)') +
+            rpTable(['지표', '평균', R.pos, '응답'].concat([5, 4, 3, 2, 1].map(function (v) { return v + '점'; })),
+              R.items.map(function (o) { return [o.item, f2(o.mean), pct(o.top2), o.n].concat([4, 3, 2, 1, 0].map(function (i) { return o.counts[i]; })); }),
+              [1, 2, 3, 4, 5, 6, 7, 8]);
+        } else if (b.type === 'timetable') {
+          if (!S.courses.length) return;
+          S.itemKeys.forEach(function (k, i) {
+            var cc = courseChartConfig(S, { metric: String(i), sort: 'desc' }, true);
+            parts += '<h3>' + esc(k) + ' 점수 순위</h3>' + rpFig(chartImg(cc, RP_W, cc._height), k + ' 평균 점수가 높은 순 (1~5점)');
+          });
+          parts += '<h3>과목별 상세 (시간표순)</h3>' + rpTable(['일자', '시간', '과목', '강사', '응답'].concat([].concat.apply([], S.itemKeys.map(function (k) { return [k + ' 평균', k + ' 만족 비율']; }))),
+            S.courses.slice().sort(function (a, z) { return a.pos - z.pos; }).map(function (x) {
+              return [x.date, x.time, x.title + (x.split ? ' (분반)' : ''), x.inst, x.n].concat([].concat.apply([], S.itemKeys.map(function (k) { return [f2(x.by[k].mean), pct(x.by[k].top2)]; })));
+            }), [4, 5, 6, 7, 8]) + '<div class="rp-cap">평균 = 5점 만점 평균 · 만족 비율 = 5점 척도에서 위쪽 두 칸(5점·4점)을 고른 사람의 비율</div>';
+        } else if (b.type === 'text') {
+          parts += '<h3>' + esc(R.q) + ' <span class="rp-cnt">' + R.answers.length + '건' + (R.skipped ? ' · "없음" 등 ' + R.skipped + '건 제외' : '') + '</span></h3>' +
+            (R.answers.length ? '<ol class="rp-open">' + R.answers.map(function (a) { return '<li>' + esc(a.text) + '</li>'; }).join('') + '</ol>' : '<p class="rp-cnt">응답 없음</p>');
+        }
       });
-      h += '<h3>과목별 상세 (시간표순)</h3>' + rpTable(['일자', '시간', '과목', '강사', '응답'].concat([].concat.apply([], S.itemKeys.map(function (k) { return [k + ' 평균', k + ' 만족 비율']; }))),
-        S.courses.slice().sort(function (a, b) { return a.pos - b.pos; }).map(function (x) {
-          return [x.date, x.time, x.title + (x.split ? ' (분반)' : ''), x.inst, x.n].concat([].concat.apply([], S.itemKeys.map(function (k) { return [f2(x.by[k].mean), pct(x.by[k].top2)]; })));
-        }), [4, 5, 6, 7, 8]) + '<div class="rp-cap">평균 = 5점 만점 평균 · 만족 비율 = 5점 척도에서 위쪽 두 칸(5점·4점)을 고른 사람의 비율</div></section>';
-    }
-
-    // 응답자 구성: 항목별 작은 표
-    if (S.demo.length) {
-      h += '<section><h2>응답자 구성</h2><div class="rp-demo">' + S.demo.map(function (d) {
-        var tot = d.entries.reduce(function (a, e) { return a + e[1]; }, 0);
-        return '<div class="rp-demo-i"><h4>' + esc(d.label) + '</h4>' + rpTable(['구분', '명', '비율'], d.entries.map(function (e) { return [e[0], e[1], (e[1] / tot * 100).toFixed(1) + '%']; }), [1, 2]) + '</div>';
-      }).join('') + '</div></section>';
-    }
-
-    // 서술형 의견
-    if (S.open.length) {
-      h += '<section><h2>' + esc(txt(c, 'openTitle')) + '</h2>' + S.open.map(function (q) {
-        return '<h3>' + esc(q.q) + ' <span class="rp-cnt">' + q.answers.length + '건' + (q.skipped ? ' · "없음" 등 ' + q.skipped + '건 제외' : '') + '</span></h3>' +
-          (q.answers.length ? '<ol class="rp-open">' + q.answers.map(function (a) { return '<li>' + esc(a.text) + '</li>'; }).join('') + '</ol>' : '<p class="rp-cnt">응답 없음</p>');
-      }).join('') + '</section>';
-    }
+      flush();
+      if (parts) h += '<section><h2>' + esc(sec.title) + '</h2>' + parts + '</section>';
+    });
 
     showPreview('보고서 미리보기', h, (c.title || '설문 결과') + ' 결과 보고서', true);
   }
 
   /* ───── 설문지 (종이 양식) ─────
-   * 현재 설정 그대로: 안내 문구, 기본 정보(☐), 척도표(응답 화면처럼 5점이 왼쪽), 시간표(분반은 택 1), 서술형 적는 칸 */
+   * 현재 설정 그대로: 섹션 순서, 객관식(☐ / 순위는 숫자 칸), 척도표(응답 화면처럼 5점이 왼쪽), 시간표(분반은 택 1), 서술형 적는 칸 */
   function questionnaireHTML(c) {
-    c.demographics = c.demographics || []; c.slots = c.slots || []; c.open = c.open || []; c.sessionItems = c.sessionItems || [];
-    var ov = (c.overall && c.overall.items) || [];
-    var labels = function (key) { return (c.scales[key] || []).slice().reverse(); }; // 5점 → 1점
     var circles = function (n) { var s = ''; for (var i = 0; i < n; i++) s += '<td class="qf-c">○</td>'; return s; };
-    var sec = 0, q = 0;
-    var head = function (tk, dk) { var d = txt(c, dk); return '<h2>' + (++sec) + '. ' + esc(txt(c, tk)) + '</h2>' + (d ? '<p class="qf-desc">' + esc(d) + '</p>' : ''); };
+    var rev = function (l) { return (l || []).slice().reverse(); }; // 5점 → 1점
+    var q = 0;
     var h = '<header class="rp-head"><div class="rp-kicker">설문지</div><h1>' + esc(c.title) + '</h1>' +
       (c.period ? '<div class="rp-meta">연수 기간 ' + esc(c.period) + '</div>' : '') + '</header>';
     if (c.intro) h += '<p class="qf-intro">' + esc(c.intro) + '</p>';
     h += '<p class="qf-desc">* 표시는 필수 응답입니다. 척도 문항은 해당하는 칸 하나에 ✔ 표시해 주세요.</p>';
 
-    if (c.demographics.length) {
-      h += '<section>' + head('demoTitle', 'demoDesc') + c.demographics.map(function (d) {
-        return '<div class="qf-q"><div class="qf-qt">' + (++q) + '. ' + esc(d.label) + ' *</div><div class="qf-opts">' +
-          d.options.map(function (o) { return '<span>☐ ' + esc(o) + '</span>'; }).join('') +
-          (d.other ? '<span>☐ 기타 (<span class="qf-blank"></span>)</span>' : '') + '</div></div>';
-      }).join('') + '</section>';
-    }
-
-    if (ov.length) {
-      var la = labels(c.overall.scale);
-      h += '<section>' + head('overallTitle', 'overallDesc') +
-        '<table class="rp-tbl qf-tbl"><thead><tr><th>문항</th>' + la.map(function (l) { return '<th class="qf-c">' + esc(l) + '</th>'; }).join('') + '</tr></thead><tbody>' +
-        ov.map(function (it) { return '<tr><td>' + (++q) + '. ' + esc(it.text) + ' *</td>' + circles(la.length) + '</tr>'; }).join('') + '</tbody></table></section>';
-    }
-
-    if (c.slots.length) {
-      h += '<section>' + head('slotsTitle', 'slotsDesc');
-      if (c.slots.some(function (s) { return s.options.length > 1; })) h += '<p class="qf-desc">「분반 · 택 1」 수업은 ' + esc(txt(c, 'splitHint')) + '. 들은 수업 한 줄에만 응답해 주세요.</p>';
-      c.sessionItems.forEach(function (it) {
-        var lb = labels(it.scale);
-        h += '<h3>' + (++q) + '. [' + esc(it.key) + '] ' + esc(it.text) + ' *</h3>' +
-          '<table class="rp-tbl qf-tbl"><thead><tr><th style="width:70px">일자</th><th style="width:38px">시간</th><th>과목 · 강사</th>' + lb.map(function (l) { return '<th class="qf-c">' + esc(l) + '</th>'; }).join('') + '</tr></thead><tbody>';
-        c.slots.forEach(function (s) {
-          var split = s.options.length > 1;
-          s.options.forEach(function (o, i) {
-            h += '<tr' + (split ? ' class="qf-split"' : '') + '><td>' + (i === 0 ? esc(s.date) : '') + '</td><td>' + (i === 0 ? esc(s.time) : '') + '</td><td>' +
-              (split ? '<span class="qf-tag">분반 · 택 1</span> ' : '') + esc(o.title) + (o.instructor ? ' <span class="qf-inst">(' + esc(o.instructor) + ')</span>' : '') + '</td>' + circles(lb.length) + '</tr>';
+    c.sections.forEach(function (sec, si) {
+      h += '<section><h2>' + (si + 1) + '. ' + esc(sec.title) + '</h2>' + (sec.desc ? '<p class="qf-desc">' + esc(sec.desc) + '</p>' : '');
+      sec.blocks.forEach(function (b) {
+        if (b.type === 'choice') {
+          var K = pickK(b), all = b.options.length + (b.other ? 1 : 0);
+          var hint = b.mode === 'multi' ? (K >= all ? '해당하는 것 모두 ✔' : '최대 ' + K + '개 ✔') : b.mode === 'rank' ? '중요한 순서대로 칸에 1~' + K + ' 숫자를 적어 주세요' : '';
+          var box = b.mode === 'rank' ? '<span class="qf-num"></span>' : '☐ ';
+          h += '<div class="qf-q"><div class="qf-qt">' + (++q) + '. ' + esc(b.label) + ' *' + (hint ? ' <span class="qf-hint">(' + esc(hint) + ')</span>' : '') + '</div><div class="qf-opts">' +
+            b.options.map(function (o) { return '<span>' + box + esc(o) + '</span>'; }).join('') +
+            (b.other ? '<span>' + box + '기타 (<span class="qf-blank"></span>)</span>' : '') + '</div></div>';
+        } else if (b.type === 'scale') {
+          var la = rev(b.labels);
+          h += (b.title ? '<h3>' + esc(b.title) + '</h3>' : '') +
+            '<table class="rp-tbl qf-tbl"><thead><tr><th>문항</th>' + la.map(function (l) { return '<th class="qf-c">' + esc(l) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+            b.items.map(function (it) { return '<tr><td>' + (++q) + '. ' + esc(it.text) + ' *</td>' + circles(la.length) + '</tr>'; }).join('') + '</tbody></table>';
+        } else if (b.type === 'timetable') {
+          var lb = rev(b.labels);
+          if (b.slots.some(function (s) { return s.options.length > 1; })) h += '<p class="qf-desc">「분반 · 택 1」 수업은 ' + esc(b.splitHint || '내가 들은 수업을 고르세요') + '. 들은 수업 한 줄에만 응답해 주세요.</p>';
+          b.items.forEach(function (it) {
+            h += '<h3>' + (++q) + '. [' + esc(it.key) + '] ' + esc(it.text) + ' *</h3>' +
+              '<table class="rp-tbl qf-tbl"><thead><tr><th style="width:70px">일자</th><th style="width:38px">시간</th><th>과목 · 강사</th>' + lb.map(function (l) { return '<th class="qf-c">' + esc(l) + '</th>'; }).join('') + '</tr></thead><tbody>';
+            b.slots.forEach(function (s) {
+              var split = s.options.length > 1;
+              s.options.forEach(function (o, i) {
+                h += '<tr' + (split ? ' class="qf-split"' : '') + '><td>' + (i === 0 ? esc(s.date) : '') + '</td><td>' + (i === 0 ? esc(s.time) : '') + '</td><td>' +
+                  (split ? '<span class="qf-tag">분반 · 택 1</span> ' : '') + esc(o.title) + (o.instructor ? ' <span class="qf-inst">(' + esc(o.instructor) + ')</span>' : '') + '</td>' + circles(lb.length) + '</tr>';
+              });
+            });
+            h += '</tbody></table>';
           });
-        });
-        h += '</tbody></table>';
+        } else if (b.type === 'text') {
+          h += '<div class="qf-q"><div class="qf-qt">' + (++q) + '. ' + esc(b.text) + (b.required ? ' *' : ' (선택)') + '</div><div class="qf-lines"><div></div><div></div><div></div></div></div>';
+        }
       });
       h += '</section>';
-    }
-
-    if (c.open.length) {
-      h += '<section>' + head('openTitle', 'openDesc') + c.open.map(function (o) {
-        return '<div class="qf-q"><div class="qf-qt">' + (++q) + '. ' + esc(o.text) + (o.required ? ' *' : ' (선택)') + '</div><div class="qf-lines"><div></div><div></div><div></div></div></div>';
-      }).join('') + '</section>';
-    }
-    return h + '<p class="qf-end">' + esc(txt(c, 'doneMsg')) + '</p>';
+    });
+    return h + '<p class="qf-end">' + esc(c.doneMsg || '소중한 의견 감사합니다.') + '</p>';
   }
 
   function openQuestionnaire() {
@@ -953,32 +1057,46 @@
     document.getElementById('rp-close').onclick = function () { wrap.remove(); document.body.classList.remove('reporting'); document.title = prevTitle; };
   }
 
+
   /* ───── 엑셀 ───── */
   function exportXlsx(S) {
     if (!window.XLSX) return toast('엑셀 라이브러리를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.');
-    var wb = XLSX.utils.book_new();
+    var wb = XLSX.utils.book_new(), c = D.config;
     var r2 = function (x) { return isFinite(x) ? Math.round(x * 100) / 100 : ''; };
     var p1 = function (x) { return isFinite(x) ? Math.round(x * 1000) / 10 : ''; };
 
-    var sum = [[(D.config.course || '') + ' ' + cohort + ' 사후설문 결과'], ['응답자 수', S.n], [],
-      ['[' + txt(D.config, 'overallTitle') + ']'], ['지표', '평균', txt(D.config, 'posName') + '(%)', '응답 수'].concat([1, 2, 3, 4, 5].map(function (v) { return v + '점 ' + (S.lblOverall[v - 1] || ''); }))];
-    S.overall.forEach(function (o) { sum.push([o.item, r2(o.mean), p1(o.top2), o.n].concat(o.counts)); });
-    sum.push([], ['[과목 평가 요약]'], ['구분', '평균', '만족 비율(%)', '응답 수']);
-    S.itemKeys.forEach(function (k) {
-      var s = summarize([0, 1, 2, 3, 4].map(function (i) { return S.courses.reduce(function (a, c) { return a + c.by[k].counts[i]; }, 0); }));
-      sum.push([k, r2(s.mean), p1(s.top2), s.n]);
+    var sum = [[(c.course || '') + ' ' + cohort + ' 설문 결과'], ['응답자 수', S.n]];
+    S.scaleRes.forEach(function (R) {
+      if (!R.items.length) return;
+      sum.push([], ['[' + R.name + ']'], ['지표', '평균', R.pos + '(%)', '응답 수'].concat([1, 2, 3, 4, 5].map(function (v) { return v + '점 ' + (R.labels[v - 1] || ''); })));
+      R.items.forEach(function (o) { sum.push([o.item, r2(o.mean), p1(o.top2), o.n].concat(o.counts)); });
     });
+    if (S.itemKeys.length) {
+      sum.push([], ['[과목 평가 요약]'], ['구분', '평균', '만족 비율(%)', '응답 수']);
+      courseAgg(S).forEach(function (a) { sum.push([a.k, r2(a.s.mean), p1(a.s.top2), a.s.n]); });
+    }
     addSheet(wb, '요약', sum, [26, 10, 13, 10, 14, 14, 14, 14, 14]);
 
-    var crs = [['일자', '시간', '과목', '강사', '분반', '응답 수'].concat([].concat.apply([], S.itemKeys.map(function (k) { return [k + ' 평균', k + ' 만족비율(%)']; })))];
-    S.courses.forEach(function (c) {
-      crs.push([c.date, c.time, c.title, c.inst, c.split ? '분반' : '', c.n].concat([].concat.apply([], S.itemKeys.map(function (k) { return [r2(c.by[k].mean), p1(c.by[k].top2)]; }))));
-    });
-    addSheet(wb, '과목별', crs, [11, 6, 24, 22, 6, 8, 12, 15, 12, 15]);
+    if (S.courses.length) {
+      var crs = [['일자', '시간', '과목', '강사', '분반', '응답 수'].concat([].concat.apply([], S.itemKeys.map(function (k) { return [k + ' 평균', k + ' 만족비율(%)']; })))];
+      S.courses.forEach(function (x) {
+        crs.push([x.date, x.time, x.title, x.inst, x.split ? '분반' : '', x.n].concat([].concat.apply([], S.itemKeys.map(function (k) { return [r2(x.by[k].mean), p1(x.by[k].top2)]; }))));
+      });
+      addSheet(wb, '과목별', crs, [11, 6, 24, 22, 6, 8, 12, 15, 12, 15]);
+    }
 
-    var dm = [['항목', '값', '인원', '비율(%)']];
-    S.demo.forEach(function (d) { var t = d.entries.reduce(function (a, e) { return a + e[1]; }, 0); d.entries.forEach(function (e) { dm.push([d.label, e[0], e[1], p1(e[1] / t)]); }); });
-    addSheet(wb, '응답자구성', dm, [10, 22, 8, 9]);
+    var ch = [], rk = [], maxK = 0;
+    Object.keys(S.res).forEach(function (id) { var R = S.res[id]; if (R.b.type !== 'choice' || !R.base) return; if (R.mode === 'rank') { rk.push(R); maxK = Math.max(maxK, R.K); } else ch.push(R); });
+    if (ch.length) {
+      var dm = [['문항', '값', '인원', '비율(%)', '비율 기준']];
+      ch.forEach(function (R) { R.entries.forEach(function (e) { dm.push([R.b.label, e[0], e[1], p1(R.base ? e[1] / R.base : NaN), R.mode === 'multi' ? '응답자 대비(복수 선택)' : '응답 대비']); }); });
+      addSheet(wb, '객관식', dm, [22, 26, 8, 9, 18]);
+    }
+    if (rk.length) {
+      var rs = [['문항', '순위', '항목'].concat(Array.apply(null, Array(maxK)).map(function (_, i) { return (i + 1) + '순위'; })).concat(['가중 점수'])];
+      rk.forEach(function (R) { R.rows.forEach(function (x, i) { var r = x.r.slice(); while (r.length < maxK) r.push(''); rs.push([R.b.label, i + 1, x.opt].concat(r).concat([x.score])); }); });
+      addSheet(wb, '순위', rs, [22, 6, 26].concat(Array.apply(null, Array(maxK)).map(function () { return 8; })).concat([10]));
+    }
 
     addSheet(wb, '응답자별', [D.resp.headers].concat(S.resp.map(function (o) { return D.resp.headers.map(function (h) { return numify(o[h]); }); })), D.resp.headers.map(function (h, i) { return i < 3 ? 18 : 14; }));
     addSheet(wb, '점수(피벗용)', [D.scores.headers].concat(S.scores.map(function (o) { return D.scores.headers.map(function (h) { return numify(o[h]); }); })), D.scores.headers.map(function () { return 13; }));
@@ -987,7 +1105,7 @@
     S.open.forEach(function (q) { S.resp.forEach(function (o) { var t = String(o[q.q] || '').trim(); if (t) op.push([o['응답ID'], q.q, t]); }); });
     addSheet(wb, '서술형', op, [18, 18, 90]);
 
-    XLSX.writeFile(wb, ((D.config.course || '설문') + '_' + cohort + '_결과.xlsx').replace(/[\\/:*?"<>|]/g, '_'));
+    XLSX.writeFile(wb, ((c.course || '설문') + '_' + cohort + '_결과.xlsx').replace(/[\\/:*?"<>|]/g, '_'));
   }
   function numify(v) { return v !== '' && /^-?\d+(\.\d+)?$/.test(String(v)) ? +v : v; }
   function addSheet(wb, name, aoa, widths) {
@@ -997,184 +1115,250 @@
     XLSX.utils.book_append_sheet(wb, ws, name);
   }
 
-  /* ───── 설정 ───── */
-  // 화면 문구 기본값 (Code.gs defaultTexts_, Index와 같은 값). 설정 칸을 비워 저장하면 이 값이 쓰인다.
-  var DEFAULT_TEXTS = {
-    demoTitle: '기본 정보', demoDesc: '통계 분석에만 쓰이며, 개인을 식별하지 않습니다.',
-    overallTitle: '과정 만족도', overallDesc: '교육과정과 연수 운영 전반에 대해 평가해 주세요.',
-    slotsTitle: '과목 평가', slotsDesc: '시간표 순서대로 과목마다 평가해 주세요. 분반 수업은 들은 수업만 고르면 됩니다.',
-    splitHint: '내가 들은 수업을 고르세요',
-    openTitle: '의견', openDesc: '구체적으로 적어 주시면 다음 연수에 꼭 반영하겠습니다.',
-    doneMsg: '소중한 의견 감사합니다.',
-    posName: '만족 비율'
+
+  /* ───── 설정: 섹션·문항 블록 편집 ─────
+   * W = 편집 중인 설정(저장 전). 칸에 적은 내용은 collect()로 W에 옮기고, 추가·삭제·순서 바꾸기 뒤에 다시 그린다. */
+  var W = null;
+  var BLOCK_NAMES = { choice: '객관식', scale: '5점 척도 묶음', timetable: '시간표 과목평가', text: '서술형' };
+  var LABELS = {
+    agree: ['전혀 아니다', '그렇지 않다', '보통이다', '그렇다', '매우 그렇다'],
+    quality: ['매우미흡', '미흡', '보통', '우수', '매우우수']
   };
-  function txt(c, k) { var t = c.texts && c.texts[k]; return (t != null && String(t).trim() !== '') ? String(t) : DEFAULT_TEXTS[k]; }
 
   function stepCard(num, title, desc, inner) {
     return '<div class="card"><div class="card-h"><div><h3>' + num + ' ' + esc(title) + '</h3>' + (desc ? '<div class="d">' + esc(desc) + '</div>' : '') + '</div></div>' + inner + '</div>';
   }
 
   function renderConfig() {
-    var c = D.config;
-    c.demographics = c.demographics || []; c.slots = c.slots || []; c.open = c.open || []; c.sessionItems = c.sessionItems || [];
-    c.overall = c.overall || { scale: 'agree', items: [] };
-    var rows = []; var gi = 0;
-    c.slots.forEach(function (s) {
-      var g = s.options.length > 1 ? String.fromCharCode(65 + gi++) : '';
-      s.options.forEach(function (o) { rows.push([s.date, s.time, o.title, o.instructor, g]); });
+    W = JSON.parse(JSON.stringify(D.config));
+    drawConfig();
+  }
+
+  function allIds() { var u = {}; W.sections.forEach(function (s) { u[s.id] = 1; s.blocks.forEach(function (b) { u[b.id] = 1; }); }); return u; }
+  function newId(prefix) { var u = allIds(), n = 1; while (u[prefix + n]) n++; return prefix + n; }
+  function hasTimetable() { return W.sections.some(function (s) { return s.blocks.some(function (b) { return b.type === 'timetable'; }); }); }
+
+  function mvBtns(kind, si, bi, first, last) {
+    var at = ' data-k="' + kind + '" data-si="' + si + '"' + (bi != null ? ' data-bi="' + bi + '"' : '');
+    return '<div class="sb-tools"><button class="btn sm" data-mv="-1"' + at + (first ? ' disabled' : '') + ' title="위로" aria-label="위로">▲</button>' +
+      '<button class="btn sm" data-mv="1"' + at + (last ? ' disabled' : '') + ' title="아래로" aria-label="아래로">▼</button>' +
+      '<button class="btn sm danger" data-del="1"' + at + '>삭제</button></div>';
+  }
+
+  function drawConfig() {
+    var c = W, body = document.getElementById('body'), tt = hasTimetable();
+    var h = '<div class="toolbar"><div class="grow"><h2>설문 설정</h2><div class="sub">섹션 = 응답 화면의 한 페이지. 섹션 안에 문항을 원하는 종류·순서로 넣고 ▲▼로 순서를 바꿔요. [저장]을 눌러야 반영돼요.</div></div>' +
+      '<a class="btn" id="preview" target="_blank" rel="noopener">응답 화면 열기</a><button class="btn" id="qform2" title="저장된 설정 기준">설문지 PDF</button><button class="btn primary" id="save">저장</button></div>';
+    h += stepCard('', '첫 화면 · 마무리', '설문 맨 위에 보이는 제목·안내와 제출 후 감사 메시지', '<div class="form">' +
+      field('title', '설문 제목', c.title) + field('course', '과정명', c.course) + field('cohort', '기수', c.cohort, '결과 화면·엑셀에서 응답을 묶는 이름이에요 (예: 4기)') +
+      field('period', '연수 기간', c.period) + area('intro', '안내 문구', c.intro, 5, '줄을 바꾸면 응답 화면에서도 그대로 줄이 바뀌어요.') +
+      field('doneMsg', '제출 후 감사 메시지', c.doneMsg) + '</div>');
+
+    c.sections.forEach(function (s, si) {
+      h += '<div class="card sb-sec" data-si="' + si + '"><div class="sb-head"><span class="sb-no">섹션 ' + (si + 1) + '</span>' +
+        '<input class="sb-title" value="' + esc(s.title) + '" placeholder="섹션 이름 (예: 기본 정보)" aria-label="섹션 ' + (si + 1) + ' 이름">' +
+        mvBtns('sec', si, null, si === 0, si === c.sections.length - 1) + '</div>' +
+        '<textarea class="sb-desc" rows="1" placeholder="섹션 설명 (선택) — 응답 화면에서 섹션 이름 아래에 보여요" aria-label="섹션 설명">' + esc(s.desc || '') + '</textarea>' +
+        (s.blocks.length ? s.blocks.map(function (b, bi) { return blockEditor(b, si, bi, s.blocks.length); }).join('') : '<div class="sb-empty">아직 문항이 없어요. 아래에서 추가하세요.</div>') +
+        '<div class="sb-add"><span>문항 추가</span>' + ['choice', 'scale', 'timetable', 'text'].map(function (t) {
+          return '<button class="btn sm" data-add="' + t + '" data-si="' + si + '"' + (t === 'timetable' && tt ? ' disabled title="시간표 과목평가는 설문에 하나만 넣을 수 있어요"' : '') + '>+ ' + BLOCK_NAMES[t] + '</button>';
+        }).join('') + '</div></div>';
     });
-    var body = document.getElementById('body');
-    body.innerHTML = '<div class="toolbar"><div class="grow"><h2>설문 설정</h2><div class="sub">응답 화면의 모든 문구와 문항을 여기서 정해요. 저장하면 바로 반영돼요. 어떤 단계의 문항을 모두 지우면 그 단계는 설문에서 빠져요.</div></div>' +
-      '<a class="btn" id="preview" target="_blank" rel="noopener">응답 화면 열기</a><button class="btn" id="qform2" title="저장된 설정 기준">설문지 PDF</button><button class="btn primary" id="save">저장</button></div>' +
+    h += '<button class="btn" id="add-sec">+ 섹션 추가</button><div style="height:40px"></div>';
+    body.innerHTML = h;
 
-      stepCard('', '첫 화면', '설문 맨 위에 보이는 제목과 안내', '<div class="form">' +
-        field('title', '설문 제목', c.title) + field('course', '과정명', c.course) + field('cohort', '기수', c.cohort) +
-        field('period', '연수 기간', c.period) + area('intro', '안내 문구', c.intro, 6, '줄을 바꾸면 응답 화면에서도 그대로 줄이 바뀌어요.') + '</div>') +
-
-      stepCard('①', '기본 정보 단계', '응답자 정보 (성별, 직렬 등). 모두 필수 응답이에요.', '<div class="form">' +
-        field('t-demoTitle', '단계 이름', txt(c, 'demoTitle')) + field('t-demoDesc', '단계 설명', txt(c, 'demoDesc')) + '</div>' +
-        '<div class="tbl-wrap" style="margin-top:12px"><table class="tt"><thead><tr><th style="width:120px">문항</th><th>선택지 (한 줄에 하나씩)</th><th style="width:70px">기타 입력칸</th><th>기타 입력칸 안내 문구</th><th style="width:36px"></th></tr></thead><tbody id="dt"></tbody></table></div>' +
-        '<div class="hint">선택지는 한 줄에 하나씩 적어요(쉼표가 들어가도 괜찮아요). "기타 입력칸"을 체크하면 선택지 끝에 [기타]가 생기고, 고르면 글을 적는 칸이 열려요. 안내 문구는 그 칸에 흐리게 보이는 예시예요.</div>' +
-        '<button class="btn sm" id="add-demo" style="margin-top:8px">문항 추가</button>') +
-
-      stepCard('②', '과정 만족도 단계', '과정 전반을 5점 척도로 평가', '<div class="form">' +
-        field('t-overallTitle', '단계 이름', txt(c, 'overallTitle')) + field('t-overallDesc', '단계 설명', txt(c, 'overallDesc')) +
-        area('overall', '문항', c.overall.items.map(function (i) { return i.short + ' | ' + i.text; }).join('\n'), 9, '한 줄에 하나씩 "짧은 이름 | 문항". 짧은 이름은 차트와 엑셀에 쓰여요.') +
-        field('scaleA', '척도 (1점 → 5점)', c.scales.agree.join(', '), '쉼표로 5개. 화면에는 5점이 왼쪽에 보여요.')+
-        field('t-posName', '4~5점 비율 이름', txt(c, 'posName'), '결과 화면·보고서·엑셀에서 4~5점 응답 비율을 부르는 이름 (예: 만족 비율, 필요 비율)') + '</div>') +
-
-      stepCard('③', '과목 평가 단계', '시간표의 과목마다 아래 문항을 5점 척도로 평가', '<div class="form">' +
-        field('t-slotsTitle', '단계 이름', txt(c, 'slotsTitle')) + field('t-slotsDesc', '단계 설명', txt(c, 'slotsDesc')) +
-        field('t-splitHint', '분반 선택 안내', txt(c, 'splitHint')) +
-        area('sitems', '과목마다 묻는 문항', c.sessionItems.map(function (i) { return i.key + ' | ' + i.text; }).join('\n'), 3, '한 줄에 하나씩 "구분 | 문항" (예: 강사 | 강사는 이해하기 쉽게 전달하였다.)') +
-        field('scaleB', '척도 (1점 → 5점)', c.scales.quality.join(', '), '쉼표로 5개') + '</div>' +
-        '<div class="card-h" style="margin-top:14px"><div><h3 style="font-size:14.5px">시간표</h3><div class="d">분반 수업은 [분반] 칸에 같은 글자(예: A)를 넣으면 "택 1"로 묶여요. 같은 시간에 강사가 둘이고 둘 다 듣는 수업은 분반 칸을 비워 두세요.</div></div>' +
-        '<div class="act"><button class="btn sm" id="paste-toggle">엑셀에서 붙여넣기</button><button class="btn sm" id="add-row">줄 추가</button></div></div>' +
-        '<div id="paste-box" style="display:none;margin-bottom:10px"><textarea id="paste" style="width:100%;min-height:120px;padding:8px;border:1px solid var(--axis);border-radius:8px" placeholder="엑셀에서 [일자, 시간, 과목, 강사, 분반] 5개 열을 복사해 붙여넣으세요. (분반 열은 없어도 됨)"></textarea>' +
-        '<button class="btn sm" id="paste-apply" style="margin-top:6px">표에 적용 (기존 시간표 대체)</button></div>' +
-        '<div class="tbl-wrap"><table class="tt"><thead><tr><th style="width:110px">일자</th><th style="width:70px">시간</th><th>과목</th><th>강사 (소속 이름)</th><th class="grp">분반</th><th style="width:36px"></th></tr></thead><tbody id="tt"></tbody></table></div>') +
-
-      stepCard('④', '의견 단계', '서술형 문항. 필수로 지정하지 않으면 비워도 제출돼요.', '<div class="form">' +
-        field('t-openTitle', '단계 이름', txt(c, 'openTitle')) + field('t-openDesc', '단계 설명', txt(c, 'openDesc')) + '</div>' +
-        '<div class="tbl-wrap" style="margin-top:12px"><table class="tt"><thead><tr><th style="width:150px">짧은 이름</th><th>질문</th><th style="width:60px">필수</th><th style="width:36px"></th></tr></thead><tbody id="ot"></tbody></table></div>' +
-        '<div class="hint">짧은 이름은 결과 화면과 엑셀의 열 제목으로 쓰여요.</div>' +
-        '<button class="btn sm" id="add-open" style="margin-top:8px">문항 추가</button>') +
-
-      stepCard('', '제출 완료 화면', '', '<div class="form">' + field('t-doneMsg', '감사 메시지', txt(c, 'doneMsg')) + '</div>') +
-      '<div style="height:40px"></div>';
-
-    // 시간표 표
-    var tb = document.getElementById('tt');
-    function rowHTML(r) {
-      return '<tr' + (r[4] ? ' class="split"' : '') + '>' + r.map(function (v, i) { return '<td' + (i === 4 ? ' class="grp"' : '') + '><input value="' + esc(v) + '" aria-label="' + ['일자', '시간', '과목', '강사', '분반'][i] + '"></td>'; }).join('') + '<td><button class="x" title="줄 삭제" aria-label="줄 삭제">×</button></td></tr>';
-    }
-    function drawRows(rs) { tb.innerHTML = rs.map(rowHTML).join(''); }
-    drawRows(rows);
-    tb.addEventListener('input', function (e) { var tr = e.target.closest('tr'); tr.classList.toggle('split', !!tr.querySelectorAll('input')[4].value.trim()); });
-    document.getElementById('add-row').onclick = function () { tb.insertAdjacentHTML('beforeend', rowHTML(['', '', '', '', ''])); tb.lastElementChild.querySelector('input').focus(); };
-    document.getElementById('paste-toggle').onclick = function () { var b = document.getElementById('paste-box'); b.style.display = b.style.display === 'none' ? '' : 'none'; };
-    document.getElementById('paste-apply').onclick = function () {
-      var rs = document.getElementById('paste').value.split(/\r?\n/).filter(function (l) { return l.trim(); }).map(function (l) { var p = l.split('\t'); return [0, 1, 2, 3, 4].map(function (i) { return (p[i] || '').trim(); }); });
-      if (!rs.length) return toast('붙여넣은 내용이 없어요.');
-      drawRows(rs); document.getElementById('paste-box').style.display = 'none'; toast(rs.length + '줄을 적용했어요. [저장]을 눌러야 반영돼요.');
-    };
-
-    // 기본 정보 표
-    var dt = document.getElementById('dt');
-    function demoRow(d) {
-      return '<tr data-id="' + esc(d.id || '') + '"><td><input value="' + esc(d.label || '') + '" aria-label="문항"></td>' +
-        '<td><textarea rows="' + Math.max(2, (d.options || []).length) + '" aria-label="선택지">' + esc((d.options || []).join('\n')) + '</textarea></td>' +
-        '<td style="text-align:center"><input type="checkbox"' + (d.other ? ' checked' : '') + ' aria-label="기타 입력칸" style="width:18px;height:18px"></td>' +
-        '<td><input value="' + esc(d.placeholder || '') + '" placeholder="예: 직급을 적어 주세요 (예: 7급)" aria-label="기타 입력칸 안내 문구"></td>' +
-        '<td><button class="x" title="문항 삭제" aria-label="문항 삭제">×</button></td></tr>';
-    }
-    dt.innerHTML = c.demographics.map(demoRow).join('');
-    document.getElementById('add-demo').onclick = function () { dt.insertAdjacentHTML('beforeend', demoRow({})); dt.lastElementChild.querySelector('input').focus(); };
-
-    // 서술형 표
-    var ot = document.getElementById('ot');
-    function openRow(q) {
-      return '<tr data-id="' + esc(q.id || '') + '"><td><input value="' + esc(q.short || '') + '" aria-label="짧은 이름"></td>' +
-        '<td><input value="' + esc(q.text || '') + '" aria-label="질문"></td>' +
-        '<td style="text-align:center"><input type="checkbox"' + (q.required ? ' checked' : '') + ' aria-label="필수" style="width:18px;height:18px"></td>' +
-        '<td><button class="x" title="문항 삭제" aria-label="문항 삭제">×</button></td></tr>';
-    }
-    ot.innerHTML = c.open.map(openRow).join('');
-    document.getElementById('add-open').onclick = function () { ot.insertAdjacentHTML('beforeend', openRow({})); ot.lastElementChild.querySelector('input').focus(); };
-
-    body.addEventListener('click', function (e) { if (e.target.classList.contains('x')) e.target.closest('tr').remove(); });
     document.getElementById('preview').href = surveyUrl(CUR);
     document.getElementById('save').onclick = saveCfg;
     document.getElementById('qform2').onclick = openQuestionnaire;
+    document.getElementById('add-sec').onclick = function () {
+      collect();
+      W.sections.push({ id: newId('sec'), title: '새 섹션', desc: '', blocks: [] });
+      drawConfig();
+      var last = document.querySelectorAll('.sb-sec'); last = last[last.length - 1];
+      last.scrollIntoView({ behavior: 'smooth', block: 'center' }); last.querySelector('.sb-title').select();
+    };
+    body.onclick = onConfigClick;
+    body.onchange = function (e) {
+      if (e.target.dataset.f === 'mode') {
+        var mx = e.target.closest('.sb-blk').querySelector('[data-f="max"]');
+        mx.parentNode.style.display = e.target.value === 'single' ? 'none' : '';
+      }
+    };
+    body.oninput = function (e) { if (e.target.closest('#tt')) { var tr = e.target.closest('tr'); tr.classList.toggle('split', !!tr.querySelectorAll('input')[4].value.trim()); } };
+  }
+
+  function blockEditor(b, si, bi, n) {
+    var head = '<div class="sb-bh"><span class="sb-type t-' + b.type + '">' + BLOCK_NAMES[b.type] + '</span>' + mvBtns('blk', si, bi, bi === 0, bi === n - 1) + '</div>';
+    var h = '<div class="sb-blk" data-si="' + si + '" data-bi="' + bi + '" id="blk-' + esc(b.id) + '">' + head + '<div class="form">';
+    if (b.type === 'choice') {
+      var mode = b.mode || 'single';
+      h += fieldF('label', '문항', b.label, '결과 화면·엑셀의 열 이름으로도 쓰여요') +
+        '<label>응답 방식</label><div class="sb-mode"><select data-f="mode" aria-label="응답 방식">' + [['single', '하나 고르기'], ['multi', '여러 개 고르기'], ['rank', '순위 매기기']].map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === mode ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>' +
+        '<span' + (mode === 'single' ? ' style="display:none"' : '') + '><input data-f="max" type="number" min="1" value="' + esc(b.max || '') + '" placeholder="전부" aria-label="개수"> 개까지 <span class="hint" style="display:inline">(여러 개: 최대 몇 개 / 순위: 몇 순위까지. 비우면 전부)</span></span></div>' +
+        '<label>선택지</label><div><textarea data-f="options" rows="' + Math.max(3, b.options.length) + '" aria-label="선택지">' + esc(b.options.join('\n')) + '</textarea><div class="hint">한 줄에 하나씩 (쉼표가 들어가도 괜찮아요)</div></div>' +
+        '<label>기타</label><div><label class="sb-chk"><input type="checkbox" data-f="other"' + (b.other ? ' checked' : '') + '> 끝에 [기타] 넣기 (고르면 직접 적는 칸이 열림)</label>' +
+        '<input type="text" data-f="placeholder" value="' + esc(b.placeholder || '') + '" placeholder="기타 칸 안내 문구 (예: 직렬을 적어 주세요)" aria-label="기타 칸 안내 문구" style="margin-top:6px"></div>';
+    } else if (b.type === 'scale') {
+      h += fieldF('title', '묶음 이름', b.title, '선택. 응답 화면에서 묶음 위에, 결과 화면에서 차트 제목으로 보여요 (비우면 섹션 이름)') +
+        '<label>문항</label><div><textarea data-f="items" rows="' + Math.max(3, b.items.length) + '" aria-label="척도 문항">' + esc(b.items.map(function (i) { return i.short + ' | ' + i.text; }).join('\n')) + '</textarea><div class="hint">한 줄에 하나씩 "짧은 이름 | 문항". 짧은 이름은 차트와 엑셀에 쓰여요.</div></div>' +
+        fieldF('labels', '척도 (1점 → 5점)', b.labels.join(', '), '쉼표로 5개. 응답 화면에는 5점이 왼쪽에 보여요. 예: 전혀 필요 없다, 필요 없다, 보통이다, 필요하다, 매우 필요하다') +
+        fieldF('posName', '4~5점 비율 이름', b.posName || '만족 비율', '결과 화면·보고서에서 4~5점 응답 비율을 부르는 이름 (예: 만족 비율, 필요 비율)');
+    } else if (b.type === 'timetable') {
+      var rows = [], gi = 0;
+      b.slots.forEach(function (s) {
+        var g = s.options.length > 1 ? String.fromCharCode(65 + gi++) : '';
+        s.options.forEach(function (o) { rows.push([s.date, s.time, o.title, o.instructor, g]); });
+      });
+      h += '<label>과목마다 묻는 문항</label><div><textarea data-f="items" rows="3" aria-label="과목마다 묻는 문항">' + esc(b.items.map(function (i) { return i.key + ' | ' + i.text; }).join('\n')) + '</textarea><div class="hint">한 줄에 하나씩 "구분 | 문항" (예: 강사 | 강사는 이해하기 쉽게 전달하였다.)</div></div>' +
+        fieldF('labels', '척도 (1점 → 5점)', b.labels.join(', '), '쉼표로 5개') +
+        fieldF('splitHint', '분반 선택 안내', b.splitHint || '내가 들은 수업을 고르세요') + '</div>' +
+        '<div class="card-h" style="margin:14px 0 6px"><div><h3 style="font-size:14px">시간표</h3><div class="d">분반 수업은 [분반] 칸에 같은 글자(예: A)를 넣으면 "택 1"로 묶여요. 같은 시간에 강사가 둘이고 둘 다 듣는 수업은 분반 칸을 비워 두세요.</div></div>' +
+        '<div class="act"><button class="btn sm" data-tt="paste-toggle">엑셀에서 붙여넣기</button><button class="btn sm" data-tt="add-row">줄 추가</button></div></div>' +
+        '<div id="paste-box" style="display:none;margin-bottom:10px"><textarea id="paste" style="width:100%;min-height:120px;padding:8px;border:1px solid var(--axis);border-radius:8px" placeholder="엑셀에서 [일자, 시간, 과목, 강사, 분반] 5개 열을 복사해 붙여넣으세요. (분반 열은 없어도 됨)"></textarea>' +
+        '<button class="btn sm" data-tt="paste-apply" style="margin-top:6px">표에 적용 (기존 시간표 대체)</button></div>' +
+        '<div class="tbl-wrap"><table class="tt"><thead><tr><th style="width:110px">일자</th><th style="width:70px">시간</th><th>과목</th><th>강사 (소속 이름)</th><th class="grp">분반</th><th style="width:36px"></th></tr></thead><tbody id="tt">' + rows.map(ttRow).join('') + '</tbody></table></div>';
+      return h + '</div>';
+    } else if (b.type === 'text') {
+      h += fieldF('short', '짧은 이름', b.short, '결과 화면과 엑셀의 열 이름') + fieldF('text', '질문', b.text) +
+        '<label>필수</label><div><label class="sb-chk"><input type="checkbox" data-f="required"' + (b.required ? ' checked' : '') + '> 필수 응답 (체크하지 않으면 비워도 제출돼요)</label></div>';
+    }
+    return h + '</div></div>';
+  }
+  function ttRow(r) {
+    return '<tr' + (r[4] ? ' class="split"' : '') + '>' + r.map(function (v, i) { return '<td' + (i === 4 ? ' class="grp"' : '') + '><input value="' + esc(v) + '" aria-label="' + ['일자', '시간', '과목', '강사', '분반'][i] + '"></td>'; }).join('') + '<td><button class="x" data-tt="del-row" title="줄 삭제" aria-label="줄 삭제">×</button></td></tr>';
+  }
+  function fieldF(f, label, val, hint) { return '<label>' + esc(label) + '</label><div><input type="text" data-f="' + f + '" value="' + esc(val || '') + '" aria-label="' + esc(label) + '">' + (hint ? '<div class="hint">' + esc(hint) + '</div>' : '') + '</div>'; }
+
+  function onConfigClick(e) {
+    var t = e.target.closest('button'); if (!t || t.disabled) return;
+    if (t.dataset.tt) return ttAction(t);
+    var si = +t.dataset.si, bi = t.dataset.bi != null ? +t.dataset.bi : null;
+    if (t.dataset.add) {
+      collect();
+      var b = newBlock(t.dataset.add);
+      W.sections[si].blocks.push(b);
+      drawConfig();
+      var el = document.getElementById('blk-' + b.id);
+      if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); var f = el.querySelector('input[type=text], textarea'); if (f) f.focus({ preventScroll: true }); }
+      return;
+    }
+    if (t.dataset.mv) {
+      collect();
+      var d = +t.dataset.mv, arr = t.dataset.k === 'sec' ? W.sections : W.sections[si].blocks, i = t.dataset.k === 'sec' ? si : bi;
+      if (i + d < 0 || i + d >= arr.length) return;
+      var x = arr.splice(i, 1)[0]; arr.splice(i + d, 0, x);
+      drawConfig();
+      var moved = t.dataset.k === 'sec' ? document.querySelectorAll('.sb-sec')[i + d] : document.getElementById('blk-' + x.id);
+      if (moved) { moved.classList.add('sb-flash'); moved.scrollIntoView({ block: 'nearest' }); }
+      return;
+    }
+    if (t.dataset.del) {
+      collect();
+      if (t.dataset.k === 'sec') {
+        var sec = W.sections[si];
+        if (sec.blocks.length && !confirm('「' + (sec.title || '섹션 ' + (si + 1)) + '」 섹션과 그 안의 문항 ' + sec.blocks.length + '개를 지울까요?\n([저장]을 누르기 전에는 설문에 반영되지 않아요)')) return;
+        W.sections.splice(si, 1);
+      } else {
+        var bl = W.sections[si].blocks[bi];
+        if (!confirm('「' + (bl.label || bl.title || bl.short || BLOCK_NAMES[bl.type]) + '」 문항을 지울까요?\n이미 받은 응답은 시트에 그대로 남아요.')) return;
+        W.sections[si].blocks.splice(bi, 1);
+      }
+      drawConfig();
+    }
+  }
+
+  function newBlock(type) {
+    if (type === 'choice') return { type: 'choice', id: newId('c'), label: '', options: [], other: false, placeholder: '', mode: 'single' };
+    if (type === 'scale') return { type: 'scale', id: newId('g'), title: '', labels: LABELS.agree.slice(), posName: '만족 비율', items: [] };
+    if (type === 'timetable') return { type: 'timetable', id: newId('t'), area: '과목평가', labels: LABELS.quality.slice(), splitHint: '내가 들은 수업을 고르세요', slots: [],
+      items: [{ key: '교과편성', text: '이 교과목은 업무능력 향상이나 역량개발에 도움이 될 것이다.' }, { key: '강사', text: '강사는 강의 내용을 이해하기 쉽게 전달하였고, 강의 스킬은 우수하였다.' }] };
+    return { type: 'text', id: newId('q'), short: '', text: '', required: false };
+  }
+
+  function ttAction(t) {
+    var tb = document.getElementById('tt'), a = t.dataset.tt;
+    if (a === 'del-row') t.closest('tr').remove();
+    else if (a === 'add-row') { tb.insertAdjacentHTML('beforeend', ttRow(['', '', '', '', ''])); tb.lastElementChild.querySelector('input').focus(); }
+    else if (a === 'paste-toggle') { var b = document.getElementById('paste-box'); b.style.display = b.style.display === 'none' ? '' : 'none'; }
+    else if (a === 'paste-apply') {
+      var rs = document.getElementById('paste').value.split(/\r?\n/).filter(function (l) { return l.trim(); }).map(function (l) { var p = l.split('\t'); return [0, 1, 2, 3, 4].map(function (i) { return (p[i] || '').trim(); }); });
+      if (!rs.length) return toast('붙여넣은 내용이 없어요.');
+      tb.innerHTML = rs.map(ttRow).join(''); document.getElementById('paste-box').style.display = 'none'; toast(rs.length + '줄을 적용했어요. [저장]을 눌러야 반영돼요.');
+    }
   }
 
   function field(id, label, val, hint) { return '<label for="f-' + id + '">' + esc(label) + '</label><div><input type="text" id="f-' + id + '" value="' + esc(val || '') + '">' + (hint ? '<div class="hint">' + esc(hint) + '</div>' : '') + '</div>'; }
   function area(id, label, val, rows, hint) { return '<label for="f-' + id + '">' + esc(label) + '</label><div><textarea id="f-' + id + '" rows="' + rows + '">' + esc(val || '') + '</textarea>' + (hint ? '<div class="hint">' + esc(hint) + '</div>' : '') + '</div>'; }
-  function v(id) { return document.getElementById('f-' + id).value.trim(); }
-  function lines(id) { return v(id).split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean); }
+  function v(id) { var el = document.getElementById('f-' + id); return el ? el.value.trim() : ''; }
+  function splitLines(s) { return String(s || '').split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean); }
   function pipe(l) { var i = l.indexOf('|'); return i < 0 ? [l.trim(), l.trim()] : [l.slice(0, i).trim(), l.slice(i + 1).trim()]; }
-  function list(s) { return s.split(',').map(function (x) { return x.trim(); }).filter(Boolean); }
-  function uniqueId(prefix, used) { var n = 1; while (used[prefix + n]) n++; used[prefix + n] = 1; return prefix + n; }
+  function list(s) { return String(s || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean); }
+
+  // 화면의 칸 → W
+  function collect() {
+    if (!W || !document.getElementById('f-title')) return;
+    ['title', 'course', 'cohort', 'period', 'intro', 'doneMsg'].forEach(function (k) { W[k] = v(k); });
+    document.querySelectorAll('.sb-sec').forEach(function (el) {
+      var s = W.sections[+el.dataset.si]; if (!s) return;
+      s.title = el.querySelector('.sb-title').value.trim();
+      s.desc = el.querySelector('.sb-desc').value.trim();
+    });
+    document.querySelectorAll('.sb-blk').forEach(function (el) {
+      var b = W.sections[+el.dataset.si].blocks[+el.dataset.bi]; if (!b) return;
+      var f = function (n) { return el.querySelector('[data-f="' + n + '"]'); }, val = function (n) { return f(n).value.trim(); };
+      if (b.type === 'choice') {
+        b.label = val('label'); b.mode = f('mode').value;
+        var mx = parseInt(f('max').value, 10);
+        if (b.mode !== 'single' && mx >= 1) b.max = mx; else delete b.max;
+        b.options = splitLines(f('options').value).filter(function (o) { return o !== '기타'; });
+        b.other = f('other').checked; b.placeholder = val('placeholder');
+      } else if (b.type === 'scale') {
+        b.title = val('title'); b.labels = list(f('labels').value); b.posName = val('posName') || '만족 비율';
+        b.items = splitLines(f('items').value).map(function (l) { var p = pipe(l); return { short: p[0], text: p[1] }; });
+      } else if (b.type === 'timetable') {
+        b.items = splitLines(f('items').value).map(function (l) { var p = pipe(l); return { key: p[0], text: p[1] }; });
+        b.labels = list(f('labels').value); b.splitHint = val('splitHint');
+        var slots = [], groups = {};
+        el.querySelectorAll('#tt tr').forEach(function (tr) {
+          var x = Array.prototype.map.call(tr.querySelectorAll('input'), function (i) { return i.value.trim(); });
+          if (!x[2]) return;
+          var opt = { title: x[2], instructor: x[3] };
+          if (x[4] && groups[x[4]]) { groups[x[4]].options.push(opt); return; }
+          var s = { id: 's' + (slots.length + 1), date: x[0], time: x[1], options: [opt] };
+          if (x[4]) groups[x[4]] = s;
+          slots.push(s);
+        });
+        b.slots = slots;
+      } else if (b.type === 'text') {
+        b.short = val('short'); b.text = val('text'); b.required = f('required').checked;
+        if (!b.short && b.text) b.short = b.text.slice(0, 12);
+        if (!b.text && b.short) b.text = b.short;
+      }
+    });
+  }
 
   function saveCfg() {
-    var slots = [], groups = {};
-    document.querySelectorAll('#tt tr').forEach(function (tr) {
-      var f = Array.prototype.map.call(tr.querySelectorAll('input'), function (i) { return i.value.trim(); });
-      if (!f[2]) return;
-      var opt = { title: f[2], instructor: f[3] };
-      if (f[4] && groups[f[4]]) { groups[f[4]].options.push(opt); return; }
-      var s = { id: 's' + (slots.length + 1), date: f[0], time: f[1], options: [opt] };
-      if (f[4]) groups[f[4]] = s;
-      slots.push(s);
-    });
-    var scaleA = list(v('scaleA')), scaleB = list(v('scaleB'));
-    if (scaleA.length !== 5 || scaleB.length !== 5) return toast('척도는 쉼표로 구분해 5개씩 적어 주세요.');
-
-    // 기존 문항 ID는 유지 (응답 데이터와 연결되므로)
-    var usedD = {}, demographics = [];
-    document.querySelectorAll('#dt tr').forEach(function (tr) {
-      var ins = tr.querySelectorAll('input, textarea'), label = ins[0].value.trim();
-      if (!label) return;
-      var id = tr.dataset.id && !usedD[tr.dataset.id] ? tr.dataset.id : '';
-      if (id) usedD[id] = 1;
-      demographics.push({ id: id, label: label, options: ins[1].value.split(/\r?\n/).map(function (o) { return o.trim(); }).filter(function (o) { return o && o !== '기타'; }), other: ins[2].checked, placeholder: ins[3].value.trim() });
-    });
-    demographics.forEach(function (d) { if (!d.id) d.id = uniqueId('d', usedD); });
-    var bad = demographics.filter(function (d) { return !d.options.length && !d.other; })[0];
-    if (bad) return toast('"' + bad.label + '"에 선택지가 없어요. 선택지를 넣거나 기타 입력칸을 체크해 주세요.');
-
-    var usedQ = {}, open = [];
-    document.querySelectorAll('#ot tr').forEach(function (tr) {
-      var ins = tr.querySelectorAll('input'), short = ins[0].value.trim(), text = ins[1].value.trim();
-      if (!short && !text) return;
-      var id = tr.dataset.id && !usedQ[tr.dataset.id] ? tr.dataset.id : '';
-      if (id) usedQ[id] = 1;
-      open.push({ id: id, short: short || text.slice(0, 12), text: text || short, required: ins[2].checked });
-    });
-    open.forEach(function (q) { if (!q.id) q.id = uniqueId('q', usedQ); });
-
-    var texts = {};
-    Object.keys(DEFAULT_TEXTS).forEach(function (k) { texts[k] = v('t-' + k); });
-
-    var cfg = {
-      title: v('title'), course: v('course'), cohort: v('cohort'), period: v('period'), intro: v('intro'),
-      texts: texts,
-      scales: { agree: scaleA, quality: scaleB },
-      demographics: demographics,
-      overall: { scale: 'agree', items: lines('overall').map(function (l) { var p = pipe(l); return { short: p[0], text: p[1] }; }) },
-      sessionItems: lines('sitems').map(function (l) { var p = pipe(l); return { key: p[0], text: p[1], scale: 'quality' }; }),
-      slots: slots,
-      open: open
-    };
-    if (!cfg.title || !cfg.cohort) return toast('설문 제목과 기수를 입력해 주세요.');
-    if (cfg.slots.length && !cfg.sessionItems.length) return toast('시간표가 있으면 "과목마다 묻는 문항"이 1개 이상 필요해요.');
+    collect();
+    var cfg = JSON.parse(JSON.stringify(W));
+    // 척도 묶음의 시트 열 머리·영역 이름: 응답이 쌓인 뒤에는 바꾸지 않는다(이어지도록). 응답이 없을 때는 지금 이름을 따른다.
+    var fresh = !(D.resp && D.resp.rows.length);
+    cfg.sections.forEach(function (s) { s.blocks.forEach(function (b) {
+      if (b.type !== 'scale') return;
+      if (fresh || !b.prefix) b.prefix = b.title || s.title;
+      if (fresh || !b.area) b.area = b.prefix;
+    }); });
+    var bad = '';
+    cfg.sections.some(function (s) { return s.blocks.some(function (b) { if ((b.type === 'scale' || b.type === 'timetable') && b.labels.length !== 5) { bad = '척도 이름은 쉼표로 구분해 5개를 적어 주세요.'; return true; } }); });
+    if (!cfg.title || !cfg.cohort) bad = '설문 제목과 기수를 입력해 주세요.';
+    if (bad) return toast(bad);
     var btn = document.getElementById('save'); btn.disabled = true; btn.textContent = '저장 중…';
     api('saveConfig', KEY, CUR, cfg).then(function () {
-      D.config = cfg; D.meta.title = cfg.title; D.meta.course = cfg.course; D.meta.cohort = cfg.cohort;
+      D.config = cfg; W = JSON.parse(JSON.stringify(cfg));
+      D.meta.title = cfg.title; D.meta.course = cfg.course; D.meta.cohort = cfg.cohort;
       document.querySelector('.top h1').innerHTML = esc(cfg.title) + statusBadge(D.meta.status);
       toast('저장했어요. 응답 화면에 바로 반영돼요.');
       btn.disabled = false; btn.textContent = '저장';
-      renderConfig();
+      drawConfig();
     }).catch(function (e) { btn.disabled = false; btn.textContent = '저장'; toast(errMsg(e)); });
   }
 
