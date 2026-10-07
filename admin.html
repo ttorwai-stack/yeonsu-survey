@@ -525,7 +525,8 @@
   /* ───── 데이터 가공 ───── */
   // 설정 = 섹션 → 문항 블록(choice 객관식 / scale 척도 묶음 / timetable 시간표 과목평가 / text 서술형). 결과도 이 순서대로 보여 준다.
   function objs(t) { return t.rows.map(function (r) { var o = {}; t.headers.forEach(function (h, i) { o[h] = r[i]; }); return o; }); }
-  function cohorts() { var s = []; objs(D.resp).forEach(function (o) { if (o['기수'] && s.indexOf(o['기수']) < 0) s.push(o['기수']); }); return s; }
+  // 기수는 비어 있을 수 있다(한 번만 운영하는 과정). 빈 기수도 한 묶음으로 본다.
+  function cohorts() { var s = []; objs(D.resp).forEach(function (o) { var k = o['기수'] || ''; if (s.indexOf(k) < 0) s.push(k); }); return s; }
 
   function summarize(cnt) {
     var n = 0, sum = 0; cnt.forEach(function (c, i) { n += c; sum += c * (i + 1); });
@@ -662,8 +663,8 @@
 
   function renderDash(body, cs) {
     var S = compute(cohort), c = D.config, agg = courseAgg(S);
-    var h = '<div class="toolbar"><div class="grow"><h2>' + esc(cohort) + ' 결과</h2><div class="sub">응답 ' + S.n + '명 · 점수는 5점 만점 평균, 비율은 4~5점 응답 비율</div></div>' +
-      (cs.length > 1 ? '<select id="cohort" aria-label="기수 선택">' + cs.map(function (x) { return '<option' + (x === cohort ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('') + '</select>' : '') +
+    var h = '<div class="toolbar"><div class="grow"><h2>' + (cohort ? esc(cohort) + ' 결과' : '결과') + '</h2><div class="sub">응답 ' + S.n + '명 · 점수는 5점 만점 평균, 비율은 4~5점 응답 비율</div></div>' +
+      (cs.length > 1 ? '<select id="cohort" aria-label="기수 선택">' + cs.map(function (x) { return '<option value="' + esc(x) + '"' + (x === cohort ? ' selected' : '') + '>' + esc(x || '기수 없음') + '</option>'; }).join('') + '</select>' : '') +
       '<button class="btn" id="reload">새로고침</button><button class="btn" id="qform">설문지 PDF</button><button class="btn" id="print">보고서 PDF</button><button class="btn primary" id="xlsx">엑셀 다운로드</button></div>';
 
     var sr = S.scaleRes.filter(function (R) { return R.items.length; });
@@ -900,7 +901,7 @@
     var ch = charts.filter(function (c) { return c.canvas.id === id; })[0]; if (!ch) return;
     var a = document.createElement('a');
     a.href = ch.toBase64Image('image/png', 1);
-    a.download = (cohort + '_' + name).replace(/[\\/:*?"<>|]/g, '_') + '.png';
+    a.download = [cohort, name].filter(Boolean).join('_').replace(/[\\/:*?"<>|]/g, '_') + '.png';
     document.body.appendChild(a); a.click(); a.remove();
   }
   window.addEventListener('beforeprint', function () { charts.forEach(function (c) { c.resize(); }); });
@@ -1078,7 +1079,7 @@
     var r2 = function (x) { return isFinite(x) ? Math.round(x * 100) / 100 : ''; };
     var p1 = function (x) { return isFinite(x) ? Math.round(x * 1000) / 10 : ''; };
 
-    var sum = [[(c.course || '') + ' ' + cohort + ' 설문 결과'], ['응답자 수', S.n]];
+    var sum = [[[c.course, cohort].filter(Boolean).join(' ') + ' 설문 결과'], ['응답자 수', S.n]];
     S.scaleRes.forEach(function (R) {
       if (!R.items.length) return;
       sum.push([], ['[' + R.name + ']'], ['지표', '평균', R.pos + '(%)', '응답 수'].concat([1, 2, 3, 4, 5].map(function (v) { return v + '점 ' + (R.labels[v - 1] || ''); })));
@@ -1118,7 +1119,7 @@
     S.open.forEach(function (q) { S.resp.forEach(function (o) { var t = String(o[q.q] || '').trim(); if (t) op.push([o['응답ID'], q.q, t]); }); });
     addSheet(wb, '서술형', op, [18, 18, 90]);
 
-    XLSX.writeFile(wb, ((c.course || '설문') + '_' + cohort + '_결과.xlsx').replace(/[\\/:*?"<>|]/g, '_'));
+    XLSX.writeFile(wb, ([c.course || '설문', cohort, '결과'].filter(Boolean).join('_') + '.xlsx').replace(/[\\/:*?"<>|]/g, '_'));
   }
   function numify(v) { return v !== '' && /^-?\d+(\.\d+)?$/.test(String(v)) ? +v : v; }
   function addSheet(wb, name, aoa, widths) {
@@ -1163,7 +1164,7 @@
     var h = '<div class="toolbar"><div class="grow"><h2>설문 설정</h2><div class="sub">섹션 = 응답 화면의 한 페이지. 섹션 안에 문항을 원하는 종류·순서로 넣고 ▲▼로 순서를 바꿔요. [저장]을 눌러야 반영돼요.</div></div>' +
       '<a class="btn" id="preview" target="_blank" rel="noopener">응답 화면 열기</a><button class="btn" id="qform2" title="저장된 설정 기준">설문지 PDF</button><button class="btn primary" id="save">저장</button></div>';
     h += stepCard('', '첫 화면 · 마무리', '설문 맨 위에 보이는 제목·안내와 제출 후 감사 메시지', '<div class="form">' +
-      field('title', '설문 제목', c.title) + field('course', '과정명', c.course) + field('cohort', '기수', c.cohort, '결과 화면·엑셀에서 응답을 묶는 이름이에요 (예: 4기)') +
+      field('title', '설문 제목', c.title) + field('course', '과정명', c.course) + field('cohort', '기수 (선택)', c.cohort, '같은 과정을 여러 기수로 운영할 때만 적어요 (예: 4기). 비우면 응답 화면에 기수가 나오지 않아요.') +
       field('period', '연수 기간', c.period) + area('intro', '안내 문구', c.intro, 5, '줄을 바꾸면 응답 화면에서도 그대로 줄이 바뀌어요.') +
       field('doneMsg', '제출 후 감사 메시지', c.doneMsg) + '</div>');
 
@@ -1362,7 +1363,7 @@
     }); });
     var bad = '';
     cfg.sections.some(function (s) { return s.blocks.some(function (b) { if ((b.type === 'scale' || b.type === 'timetable') && b.labels.length !== 5) { bad = '척도 이름은 쉼표로 구분해 5개를 적어 주세요.'; return true; } }); });
-    if (!cfg.title || !cfg.cohort) bad = '설문 제목과 기수를 입력해 주세요.';
+    if (!cfg.title) bad = '설문 제목을 입력해 주세요.';
     if (bad) return toast(bad);
     var btn = document.getElementById('save'); btn.disabled = true; btn.textContent = '저장 중…';
     api('saveConfig', KEY, CUR, cfg).then(function () {
