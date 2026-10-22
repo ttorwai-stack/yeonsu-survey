@@ -444,15 +444,23 @@
     return h;
   }
 
+  // 택 1 수업의 과목명이 "과목 (1분임)", "과목 (2분임)"처럼 같으면 과목명을 제목으로, 괄호 안(1분임)을 선택지로 보여 준다
+  function splitParts(s) {
+    var parts = s.options.map(function (o) { var m = String(o.title).match(/^(.*\S)\s*\(([^()]+)\)\s*$/); return m ? [m[1], m[2]] : null; });
+    var same = parts.every(function (p) { return p && p[0] === parts[0][0]; });
+    return same ? { title: parts[0][0], names: parts.map(function (p) { return p[1]; }) } : null;
+  }
   function slotCard(b, s) {
     var a = A.ans[b.id][s.id], split = s.options.length > 1, o = a.choice != null ? s.options[a.choice] : null;
+    var sp = split ? splitParts(s) : null;
     var h = '<div class="card" id="s-' + esc(s.id) + '"><div class="sess-h"><span class="when">' + esc(s.time) + '</span><div>';
-    if (split) h += '<div class="sess-t">분반 수업<span class="split-badge">택 1</span></div><div class="sess-i">' + (o ? esc(o.title) + ' · ' + esc(o.instructor) : '수강한 분반을 선택해 주세요') + '</div>';
+    if (split) h += '<div class="sess-t">' + esc(sp ? sp.title : '분반 수업') + '<span class="split-badge">택 1</span></div><div class="sess-i">' +
+      (o ? esc(sp ? sp.names[a.choice] : o.title) + ' · ' + esc(o.instructor) : '내가 들은 수업을 선택해 주세요') + '</div>';
     else h += '<div class="sess-t">' + esc(o.title) + '</div>' + (o.instructor ? '<div class="sess-i">강사 ' + esc(o.instructor) + '</div>' : '');
     h += '</div><span class="done-mark" aria-hidden="true"></span></div>';
     if (split) {
       h += '<p class="pick-hint">' + esc(b.splitHint || '내가 들은 수업을 고르세요') + ' <span class="req">*</span></p><div class="pick" data-unit>' + s.options.map(function (op, i) {
-        return '<label class="chip"><input type="radio" name="pick:' + esc(b.id) + ':' + esc(s.id) + '" value="' + i + '"' + (a.choice === i ? ' checked' : '') + '><span>' + esc(op.title) + '<small>' + esc(op.instructor) + '</small></span></label>';
+        return '<label class="chip"><input type="radio" name="pick:' + esc(b.id) + ':' + esc(s.id) + '" value="' + i + '"' + (a.choice === i ? ' checked' : '') + '><span>' + esc(sp ? sp.names[i] : op.title) + '<small>' + esc(op.instructor) + '</small></span></label>';
       }).join('') + '</div>';
     }
     b.items.forEach(function (it) {
