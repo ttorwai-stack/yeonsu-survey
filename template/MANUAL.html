@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>연수 설문 시스템 설치 매뉴얼</title>
+<style>
+  :root { color-scheme: light dark; --bg:#f6f7f9; --card:#fff; --ink:#15171a; --mute:#5b6470; --line:#e2e5ea; --accent:#2a78d6; --soft:#e8f1fc; --warn:#fff6e0; --warn-line:#f0d58a; --code:#f0f2f5; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14161a; --card:#1c1f25; --ink:#eceef1; --mute:#a0a8b3; --line:#2d323b; --accent:#6aaaf2; --soft:#1d2b3f; --warn:#3a3118; --warn-line:#6b5a22; --code:#262a32; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.7 "Pretendard Variable", Pretendard, system-ui, -apple-system, "Malgun Gothic", sans-serif; }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { font-size: 26px; margin: 8px 0 4px; }
+  h2 { font-size: 20px; margin: 0 0 10px; }
+  h3 { font-size: 16px; margin: 18px 0 6px; }
+  .sub { color: var(--mute); margin: 0 0 20px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin: 16px 0; }
+  .num { display:inline-block; min-width: 28px; height: 28px; line-height: 28px; text-align:center; border-radius: 14px; background: var(--accent); color:#fff; font-size: 14px; margin-right: 8px; }
+  ol, ul { padding-left: 22px; margin: 8px 0; }
+  li { margin: 5px 0; }
+  code, kbd { background: var(--code); border-radius: 5px; padding: 1px 6px; font: 14px/1.5 ui-monospace, Menlo, Consolas, monospace; word-break: break-all; }
+  pre { background: var(--code); border-radius: 10px; padding: 12px 14px; overflow-x: auto; font: 13.5px/1.6 ui-monospace, Menlo, Consolas, monospace; margin: 10px 0; }
+  .note { background: var(--soft); border-radius: 10px; padding: 10px 14px; margin: 12px 0; }
+  .warn { background: var(--warn); border: 1px solid var(--warn-line); border-radius: 10px; padding: 10px 14px; margin: 12px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--code); }
+  .flow { font-size: 15px; line-height: 2; }
+  .flow b { background: var(--soft); border-radius: 8px; padding: 2px 8px; }
+  details { border-top: 1px solid var(--line); padding: 8px 0; }
+  details:first-of-type { border-top: 0; }
+  summary { cursor: pointer; font-weight: 600; }
+  .credit { text-align:center; font-size: 12px; opacity: .45; margin-top: 28px; }
+  @media print { body { background:#fff; color:#000; } section { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>연수 설문 시스템 설치 매뉴얼</h1>
+<p class="sub">내 구글 계정과 GitHub 계정만으로 나만의 연수 설문 시스템을 만드는 방법이에요. 처음이어도 30분 정도면 끝나요. 비용은 들지 않아요.</p>
+
+<section>
+<h2>0. 먼저 이해하기</h2>
+<p class="flow">연수생 → <b>① 화면</b>(GitHub Pages) → <b>② 서버</b>(Apps Script) → <b>③ 저장소</b>(구글 시트·드라이브)</p>
+<table>
+<tr><th>부품</th><th>하는 일</th><th>누구 계정?</th></tr>
+<tr><td>① 화면<br>(<code>index.html</code>, <code>admin.html</code>)</td><td>연수생이 보는 설문 화면, 내가 보는 관리·결과 화면</td><td>내 GitHub</td></tr>
+<tr><td>② 서버<br>(<code>Code.gs</code>)</td><td>응답을 받아 시트에 저장하고, 비밀번호를 확인하고, 설문을 만들어 줌</td><td>내 구글</td></tr>
+<tr><td>③ 저장소</td><td>관리용 시트(설문 목록)와, 설문마다 자동으로 만들어지는 응답 시트</td><td>내 구글 드라이브</td></tr>
+</table>
+<div class="note">내 설문과 응답은 <b>내 구글 드라이브에만</b> 저장돼요. 이 시스템을 알려준 사람은 내 응답을 볼 수 없어요.</div>
+
+<h3>준비물</h3>
+<ul>
+<li>구글 계정 (지메일)</li>
+<li>GitHub 계정 (<a href="https://github.com/signup" target="_blank" rel="noopener">github.com/signup</a>에서 무료 가입)</li>
+<li>받은 파일: <code>index.html</code>, <code>admin.html</code>, <code>Code.gs</code></li>
+<li>컴퓨터 (설치는 컴퓨터로 하는 게 편해요. 설치 후 관리·결과 보기는 폰에서도 돼요)</li>
+</ul>
+</section>
+
+<section>
+<h2><span class="num">1</span>GitHub에 화면 올리기</h2>
+<ol>
+<li>GitHub에 로그인한 뒤 오른쪽 위 <kbd>+</kbd> → <kbd>New repository</kbd>를 눌러요.</li>
+<li>Repository name에 영어 이름을 적어요. 예: <code>my-survey</code></li>
+<li><b>Public</b>을 선택하고 <kbd>Create repository</kbd>를 눌러요.</li>
+<li>만들어진 화면에서 <kbd>uploading an existing file</kbd> 링크를 눌러요.</li>
+<li><code>index.html</code>과 <code>admin.html</code> 두 파일을 끌어다 놓고, 아래쪽 <kbd>Commit changes</kbd>를 눌러요.</li>
+<li>위쪽 <kbd>Settings</kbd> → 왼쪽 <kbd>Pages</kbd>로 가요.</li>
+<li><b>Source</b>는 <kbd>Deploy from a branch</kbd>, <b>Branch</b>는 <code>main</code> / <code>(root)</code>로 고르고 <kbd>Save</kbd>를 눌러요.</li>
+<li>1~2분 뒤 같은 화면 위쪽에 내 사이트 주소가 나와요. 이걸 적어 두세요.
+<pre>https://내GitHub아이디.github.io/my-survey/</pre></li>
+</ol>
+<div class="warn"><b>Public(공개)이어야 해요.</b> 무료 계정은 공개 저장소만 Pages를 쓸 수 있어요. 올리는 파일은 화면 코드뿐이고 설문 응답이나 비밀번호는 들어 있지 않아서 괜찮아요.</div>
+</section>
+
+<section>
+<h2><span class="num">2</span>구글 시트에 서버 코드 넣기</h2>
+<ol>
+<li><a href="https://sheets.new" target="_blank" rel="noopener">sheets.new</a>로 새 스프레드시트를 만들고 이름을 <code>연수 설문 DB</code>로 바꿔요.</li>
+<li>위 메뉴 <kbd>확장 프로그램</kbd> → <kbd>Apps Script</kbd>를 눌러요. 새 탭에 편집기가 열려요.</li>
+<li>편집기 가운데 코드(<code>function myFunction() {...}</code>)를 <b>모두 지우고</b>, 받은 <code>Code.gs</code> 내용을 <b>전체 복사해서 붙여넣어요</b>.</li>
+<li>코드 위쪽에서 <code>PAGES_BASE</code>가 있는 줄을 찾아 1단계에서 적어 둔 주소로 바꿔요. 끝의 <code>/</code>까지 넣어요.
+<pre>var PAGES_BASE = 'https://내GitHub아이디.github.io/my-survey/';</pre></li>
+<li><kbd>Ctrl+S</kbd>(맥은 <kbd>⌘+S</kbd>)로 저장해요. 프로젝트 이름을 물으면 아무거나 적어도 돼요.</li>
+</ol>
+</section>
+
+<section>
+<h2><span class="num">3</span>초기 설정 (처음 한 번)</h2>
+<ol>
+<li>구글 시트 탭으로 돌아가 <b>새로고침(F5)</b>을 해요. 몇 초 뒤 메뉴에 <kbd>설문 도구</kbd>가 생겨요.</li>
+<li><kbd>설문 도구</kbd> → <kbd>① 초기 설정</kbd>을 눌러요.</li>
+<li>권한 승인 창이 뜨면 내 계정을 고르고 허용해요.
+<div class="note">"확인되지 않은 앱" 경고가 나와요. 내가 방금 만든 코드라서 정상이에요. <kbd>고급</kbd> → <kbd>(안전하지 않음)으로 이동</kbd> → <kbd>허용</kbd> 순서로 누르세요.</div></li>
+<li>끝나면 다시 <kbd>설문 도구</kbd> → <kbd>① 초기 설정</kbd>을 한 번 더 눌러요. 이번에는 <b>관리자 비밀번호</b>를 묻는데, 설문 관리 화면에 들어갈 때 쓸 비밀번호를 정해서 입력하세요.</li>
+<li>"초기 설정 완료" 창이 뜨면 성공이에요. 내 드라이브에 <code>연수 설문</code> 폴더가 생겨요.</li>
+</ol>
+<div class="warn">비밀번호는 너무 쉽게 정하지 마세요. 연수생에게는 알려주지 않아요. 잊어버리면 <kbd>설문 도구</kbd> → <kbd>관리자 비밀번호 변경</kbd>으로 다시 정할 수 있어요.</div>
+</section>
+
+<section>
+<h2><span class="num">4</span>웹앱으로 배포하기</h2>
+<ol>
+<li>Apps Script 편집기 오른쪽 위 <kbd>배포</kbd> → <kbd>새 배포</kbd>를 눌러요.</li>
+<li>왼쪽 톱니바퀴(유형 선택) → <kbd>웹 앱</kbd>을 골라요.</li>
+<li>다음처럼 설정하고 <kbd>배포</kbd>를 눌러요.
+<table>
+<tr><th>실행 사용자</th><td><b>나</b></td></tr>
+<tr><th>액세스 권한이 있는 사용자</th><td><b>모든 사용자</b></td></tr>
+</table></li>
+<li>권한을 다시 물으면 3단계처럼 허용해요.</li>
+<li>"새 배포 만들기" 창에 웹 앱 URL이 나오지만 복사하지 않아도 돼요. 다음 단계에서 주소를 따로 받아요.</li>
+</ol>
+<div class="warn"><b>"모든 사용자"가 맞아요.</b> 연수생이 구글 로그인 없이 응답해야 해서 그래요. 관리 기능은 비밀번호가 없으면 쓸 수 없어요.</div>
+</section>
+
+<section>
+<h2><span class="num">5</span>내 관리자 페이지 열기</h2>
+<ol>
+<li>구글 시트 탭에서 <kbd>설문 도구</kbd> → <kbd>웹앱 주소 보기</kbd>를 눌러요.</li>
+<li>"관리자 페이지" 아래에 나오는 주소를 복사해서 브라우저에 붙여넣어요. 이런 모양이에요.
+<pre>https://내GitHub아이디.github.io/my-survey/admin.html?api=AKfycb…</pre></li>
+<li>3단계에서 정한 비밀번호로 들어가요.</li>
+<li>이 주소를 <b>즐겨찾기</b>해 두세요. 폰에도 보내 두면 편해요.</li>
+</ol>
+<div class="note">주소 뒤의 <code>?api=AKfycb…</code>가 "내 서버가 어디인지" 알려주는 부분이에요. 지우지 마세요. 한 번 들어오면 그 기기가 기억해 줘요.</div>
+</section>
+
+<section>
+<h2><span class="num">6</span>첫 설문 만들고 보내기</h2>
+<ol>
+<li>관리자 페이지에서 <kbd>새 설문</kbd>을 눌러 틀(사후설문 / 사전설문 / 빈 설문)을 골라요.</li>
+<li>제목, 과정명, 기수, 안내 문구, 문항을 내 연수에 맞게 고치고 저장해요.</li>
+<li>설문 목록의 <kbd>링크 복사</kbd>를 눌러 연수생에게 보내요. (문자, 메신저, QR 모두 가능)</li>
+<li><b>꼭 먼저 직접 응답해 보세요.</b> 폰으로 응답한 뒤 결과 화면에 잘 들어왔는지 확인하면 안심이에요.</li>
+<li>응답 수집이 끝나면 <kbd>마감하기</kbd>를 눌러요. 필요하면 <kbd>다시 열기</kbd>도 돼요.</li>
+</ol>
+
+<h3>데이터는 어디에 쌓이나요?</h3>
+<ul>
+<li>드라이브 <code>연수 설문</code> 폴더에 설문마다 시트가 하나씩 만들어져요.</li>
+<li><code>응답자</code> 탭: 한 줄에 응답자 1명. <code>점수</code> 탭: 한 줄에 점수 1개(피벗 표나 통계용). <code>수신</code> 탭: 접수 대기함이라 건드리지 마세요.</li>
+<li><code>설정</code> 탭은 설문 설정 원본이라 직접 고치지 마세요. 항상 관리자 페이지에서 고쳐요.</li>
+</ul>
+</section>
+
+<section>
+<h2>7. 선택 사항</h2>
+
+<h3>연수생 링크를 짧게 만들기</h3>
+<p>기본 링크에는 <code>?api=…</code>가 붙어서 길어요. 짧게 하려면 GitHub의 <code>index.html</code>, <code>admin.html</code> 두 파일에서 <code>DEFAULT_API_ID</code>가 있는 줄을 찾아 내 배포 ID(<code>AKfycb…</code>)를 넣으세요. 파일 화면의 연필 아이콘으로 고치고 <kbd>Commit changes</kbd>를 누르면 돼요.</p>
+<pre>var DEFAULT_API_ID = 'AKfycb여기에내배포ID';</pre>
+<p>배포 ID는 5단계 관리자 주소에서 <code>api=</code> 뒤의 글자예요.</p>
+
+<h3>코드를 고친 뒤 다시 배포하기</h3>
+<p><code>Code.gs</code>를 고쳤다면 Apps Script 편집기에서 <kbd>배포</kbd> → <kbd>배포 관리</kbd> → 연필 아이콘 → 버전 <kbd>새 버전</kbd> → <kbd>배포</kbd>를 눌러요. <b>새 배포를 만들지 말고 기존 배포를 편집</b>해야 주소(배포 ID)가 그대로 유지돼요.</p>
+
+<h3>화면 파일 업데이트 받기</h3>
+<p>새 버전의 <code>index.html</code>, <code>admin.html</code>을 받으면 GitHub 저장소에서 <kbd>Add file</kbd> → <kbd>Upload files</kbd>로 같은 이름으로 올려 덮어쓰세요. 단, 7번의 <code>DEFAULT_API_ID</code>를 고쳐 뒀다면 새 파일에도 다시 넣어야 해요.</p>
+</section>
+
+<section>
+<h2>8. 문제가 생겼을 때</h2>
+<details><summary>관리자 페이지에서 "서버가 연결되지 않았어요"가 떠요</summary>
+<p>주소 뒤에 <code>?api=…</code>가 빠졌어요. 시트의 <kbd>설문 도구</kbd> → <kbd>웹앱 주소 보기</kbd>에서 나온 주소로 다시 들어가세요.</p></details>
+<details><summary>"초기 설정이 필요해요"가 떠요</summary>
+<p>3단계를 안 했거나, 다른 시트에 붙인 코드를 배포했어요. 설문 DB 시트에서 <kbd>설문 도구</kbd> → <kbd>① 초기 설정</kbd>을 실행하세요.</p></details>
+<details><summary>"비밀번호가 맞지 않아요"가 떠요</summary>
+<p>시트 메뉴 <kbd>설문 도구</kbd> → <kbd>관리자 비밀번호 변경</kbd>으로 새로 정하세요.</p></details>
+<details><summary>"웹앱 주소 보기"에서 PAGES_BASE를 바꾸라고 해요</summary>
+<p>2단계 4번을 빠뜨렸어요. 코드 위쪽 <code>PAGES_BASE</code>를 내 GitHub Pages 주소로 바꾸고 저장하세요. 주소는 <code>https://아이디.github.io/저장소이름/</code> 모양이어야 하고, 끝에 <code>/</code>가 있어야 해요.</p></details>
+<details><summary>GitHub 주소로 들어가면 404가 떠요</summary>
+<p>Pages를 켠 직후에는 1~2분 걸려요. 계속 안 되면 Settings → Pages에서 Branch가 <code>main</code>인지, 저장소가 Public인지 확인하세요. 주소 끝에 <code>admin.html</code>을 붙였는지도 보세요.</p></details>
+<details><summary>연수생이 제출했는데 "서버가 바빠요" 또는 오류가 나요</summary>
+<p>배포의 <b>액세스 권한이 "모든 사용자"</b>인지 확인하세요(배포 관리에서 볼 수 있어요). 구글이 일시적으로 혼잡할 때는 화면이 자동으로 다시 시도해요. 수십 명이 동시에 낼 때도 접수 대기함 방식이라 응답이 사라지지 않아요.</p></details>
+<details><summary>결과 화면에 응답이 안 보여요</summary>
+<p>결과 화면을 새로고침하세요. 접수 대기함(<code>수신</code> 탭)에 있는 응답도 결과에 합쳐서 보여줘요. 그래도 없으면 연수생이 다른 설문 링크로 응답한 건 아닌지 확인하세요.</p></details>
+<details><summary>구글 계정이 바뀌면 어떻게 하나요?</summary>
+<p>설문 DB 시트와 <code>연수 설문</code> 폴더를 새 계정으로 옮기는 건 복잡해요. 처음부터 오래 쓸 계정(개인 지메일 권장)으로 만드세요.</p></details>
+<details><summary>이 시스템을 쓰는 사람을 늘리고 싶어요</summary>
+<p>관리자가 여러 명이면 <b>각자 이 매뉴얼대로 자기 시트·자기 서버</b>를 만들면 돼요. 같은 GitHub 화면을 같이 써도 되고, 각자 따로 올려도 돼요. 링크의 <code>api=</code>로 각자의 서버를 구분해요.</p></details>
+</section>
+
+<section>
+<h2>9. 개인정보와 안전</h2>
+<ul>
+<li>설문에는 이름·연락처 같은 <b>식별 정보를 묻지 않는 것</b>을 권장해요. 통계용 기본 정보(직급, 경력 등)만 쓰면 부담이 적어요.</li>
+<li>응답 시트는 내 드라이브에 있고 나만 볼 수 있어요. 다른 사람과 공유할 때는 필요한 시트만 공유하세요.</li>
+<li>관리자 비밀번호는 쉽게 추측되지 않게 정하고, 연수생과 공유하지 마세요.</li>
+<li>GitHub 저장소는 공개이므로 화면 파일 외에 개인정보 파일을 올리지 마세요.</li>
+</ul>
+</section>
+
+<section>
+<h2>10. 사용 조건</h2>
+<p>이 시스템은 자유롭게 설치해서 쓸 수 있어요. 대신 아래 제작 표시는 <b>화면 하단에서 지우거나 바꾸지 말고 그대로 유지</b>해 주세요. <code>index.html</code>, <code>admin.html</code>, <code>Code.gs</code>에 들어 있어요.</p>
+<pre>Prompted by kidsreturn_79 · © 2026.10</pre>
+<p>이 표시를 유지하는 것을 조건으로 사용을 허락한 것이며, 이 시스템을 그대로 또는 고쳐서 다시 배포할 때도 같은 조건이 따라가요.</p>
+</section>
+
+<div class="credit">Prompted by kidsreturn_79 · © 2026.10</div>
+</div>
+</body>
+</html>

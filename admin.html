@@ -228,10 +228,12 @@
     th { position: static; }
     .wrap { max-width: none; padding: 0; }
   }
+  .credit { margin: 28px 0 20px; padding: 0 16px; text-align: center; font-size: 11px; letter-spacing: .02em; color: var(--ink); opacity: .35; }
 </style>
 </head>
 <body>
 <div id="root"><div class="empty">불러오는 중…</div></div>
+<div class="credit">Prompted by kidsreturn_79 · © 2026.10</div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -265,6 +267,7 @@
   // 제출은 화면이 만든 응답ID로 보내므로 다시 보내도 서버에서 하나만 저장된다.
   function httpOnce(name, args, attempt) {
     attempt = attempt || 0;
+    if (!API_ID) { var ne = new Error('서버가 연결되지 않았어요. 로그인 화면의 [서버 변경]에서 내 웹앱 주소를 넣어 주세요.'); ne.final = true; return Promise.reject(ne); }
     var waits = [1500, 3000, 5000, 8000];
     var retry = function (why) {
       if (attempt >= waits.length) throw why;
@@ -379,7 +382,7 @@
   function showLogin(msg) {
     root.innerHTML = '<form class="login" id="lf"><h2>설문 관리 · 관리자</h2><input type="password" id="pw" placeholder="관리자 비밀번호" autocomplete="current-password" autofocus>' +
       '<div class="err">' + esc(msg || '') + '</div><button class="btn primary" style="width:100%;padding:11px">들어가기</button>' +
-      (MODE === 'http' ? '<div class="srv">연결된 서버: …' + esc(API_ID.slice(-8)) + (API_ID === DEFAULT_API_ID ? ' (기본)' : '') + ' <button type="button" class="btn sm" id="chg-api">서버 변경</button></div>' : '') + '</form>';
+      (MODE === 'http' ? '<div class="srv">' + (API_ID ? '연결된 서버: …' + esc(API_ID.slice(-8)) + (API_ID === DEFAULT_API_ID ? ' (기본)' : '') : '연결된 서버 없음') + ' <button type="button" class="btn sm" id="chg-api">서버 변경</button></div>' : '') + '</form>';
     var chg = document.getElementById('chg-api');
     if (chg) chg.onclick = function () {
       var v = prompt('내 웹앱 주소를 붙여넣으세요.\n(시트 메뉴 [설문 도구 → 웹앱 주소 보기]에 나와요. 비워 두면 기본 서버)', 'https://script.google.com/macros/s/' + API_ID + '/exec');

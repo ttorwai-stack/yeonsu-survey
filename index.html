@@ -143,10 +143,13 @@
     .step.on { font-size: 12.5px; }
     .step.on b { margin-right: 4px; }
   }
+  /* 제작 표시: 고정 하단 버튼 줄(.nav) 위쪽 여백 안에 놓는다 */
+  .credit { position: relative; margin: -98px 0 0; padding: 0 16px calc(86px + env(safe-area-inset-bottom)); text-align: center; font-size: 11px; letter-spacing: .02em; color: var(--ink); opacity: .35; }
 </style>
 </head>
 <body>
 <div id="app"><div class="center"><p>설문을 불러오는 중…</p></div></div>
+<div class="credit">Prompted by kidsreturn_79 · © 2026.10</div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -175,6 +178,7 @@
   // 제출은 화면이 만든 응답ID로 보내므로 다시 보내도 서버에서 하나만 저장된다.
   function httpOnce(name, args, attempt) {
     attempt = attempt || 0;
+    if (!API_ID) { var ne = new Error('서버가 연결되지 않았어요. 설문 담당자에게 받은 링크로 다시 들어와 주세요.'); ne.final = true; return Promise.reject(ne); }
     var waits = [1500, 3000, 5000, 8000];
     var retry = function (why) {
       if (attempt >= waits.length) throw why;
