@@ -24,7 +24,7 @@ var SHEET_RESP = '응답자';
 var SHEET_SCORE = '점수';
 var SHEET_REG = '설문목록';
 var FOLDER_NAME = '연수 설문';
-var REG_HEADERS = ['설문ID', '제목', '과정', '기수', '상태', '응답 수', '만든 날짜', '마지막 응답', '시트 ID', '시트 주소'];
+var REG_HEADERS = ['설문ID', '제목', '과정', '기수', '상태', '응답 수', '만든 날짜', '마지막 응답', '시트 ID', '시트 주소', '마감 예정'];
 var STATUS_OPEN = '진행 중';
 var STATUS_CLOSED = '마감';
 var EDIT_KEY_HEADER = '수정키'; // 응답 수정용 열쇠. 관리 화면·엑셀에는 내보내지 않는다.
@@ -184,7 +184,7 @@ function getAppUrl() {
 var API_ACTIONS = {
   listOpenSurveys: listOpenSurveys, getSurvey: getSurvey, submitResponse: submitResponse,
   verifyKey: verifyKey, listSurveys: listSurveys, createSurvey: createSurvey,
-  setSurveyStatus: setSurveyStatus, getResults: getResults, saveConfig: saveConfig
+  setSurveyStatus: setSurveyStatus, getResults: getResults, saveConfig: saveConfig, setCloseAt: setCloseAt
 };
 
 function doPost(e) {
@@ -423,8 +423,25 @@ function createSurveyFromConfig_(cfg) {
 function setSurveyStatus(key, id, status) {
   requireKey_(key);
   if (status !== STATUS_OPEN && status !== STATUS_CLOSED) throw new Error('잘못된 상태예요.');
-  updateSurvey_(id, { '상태': status });
+  var fields = { '상태': status };
+  // 예약 시각이 이미 지난 설문을 다시 열면, 바로 또 닫히지 않도록 예약을 해제한다
+  var m = findSurvey_(id);
+  if (status === STATUS_OPEN && m && isDue_(m.closeAt)) fields['마감 예정'] = '';
+  updateSurvey_(id, fields);
   return { ok: true };
+}
+
+/** 자동 마감 시각 예약. closeAt = "yyyy-MM-dd HH:mm"(한국 시간). 빈 값이면 예약 해제. */
+function setCloseAt(key, id, closeAt) {
+  requireKey_(key);
+  closeAt = String(closeAt || '').trim();
+  if (closeAt) {
+    if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(closeAt)) throw new Error('마감 시각 형식이 맞지 않아요. 예: 2026-11-01 23:59');
+    if (closeAt <= nowKst_()) throw new Error('지금보다 이후 시각으로 정해 주세요.');
+  }
+  if (!findSurvey_(id)) throw new Error('설문을 찾을 수 없어요.');
+  updateSurvey_(id, { '마감 예정': closeAt });
+  return { ok: true, closeAt: closeAt };
 }
 
 function getResults(key, id) {
@@ -517,14 +534,41 @@ function cacheGet_(k) { try { var v = cache_().get(k); return v ? JSON.parse(v) 
 function cachePut_(k, v, sec) { try { cache_().put(k, JSON.stringify(v), sec); } catch (e) { /* 캐시는 없어도 동작 */ } }
 function cacheDel_(k) { try { cache_().remove(k); } catch (e) { /* 무시 */ } }
 
+function nowKst_() { return Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm'); }
+
+/** 예약 시각("yyyy-MM-dd HH:mm", 한국 시간)이 지났는지. 같은 형식 문자열끼리라 글자 순서 비교로 충분하다. */
+function isDue_(closeAt) {
+  return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(String(closeAt || '')) && String(closeAt) <= nowKst_();
+}
+
+/** 진행 중인 설문 중 예약 시각이 지난 것은 마감으로 본다. (읽는 순간 계산하므로 응답 접수도 정확히 그 시각에 멈춘다) */
+function applySchedule_(list) {
+  return list.map(function (m) {
+    if (m.status !== STATUS_OPEN || !isDue_(m.closeAt)) return m;
+    var c = {};
+    Object.keys(m).forEach(function (k) { c[k] = m[k]; });
+    c.status = STATUS_CLOSED;
+    c.autoClosed = true;
+    return c;
+  });
+}
+
 function listSurveys_(fresh) {
-  if (!fresh) { var c = cacheGet_(CACHE_LIST_KEY); if (c) return c; }
+  if (!fresh) { var c = cacheGet_(CACHE_LIST_KEY); if (c) return applySchedule_(c); }
   var sh = registry_();
-  var list = sh.getLastRow() < 2 ? [] : sh.getRange(2, 1, sh.getLastRow() - 1, REG_HEADERS.length).getDisplayValues()
-    .filter(function (r) { return r[0]; })
-    .map(function (r) {
-      return { id: r[0], title: r[1], course: r[2], cohort: r[3], status: r[4], count: +r[5] || 0, created: r[6], last: r[7], sheetId: r[8], sheetUrl: r[9] };
-    });
+  var rows = sh.getLastRow() < 2 ? [] : sh.getRange(2, 1, sh.getLastRow() - 1, REG_HEADERS.length).getDisplayValues();
+  var list = [], rowOf = [];
+  rows.forEach(function (r, i) {
+    if (!r[0]) return;
+    list.push({ id: r[0], title: r[1], course: r[2], cohort: r[3], status: r[4], count: +r[5] || 0, created: r[6], last: r[7], sheetId: r[8], sheetUrl: r[9], closeAt: r[10] || '' });
+    rowOf.push(i + 2);
+  });
+  list = applySchedule_(list);
+  // 예약 시각이 지난 설문은 시트의 상태 칸도 마감으로 맞춰 둔다
+  list.forEach(function (m, i) {
+    if (!m.autoClosed) return;
+    try { sh.getRange(rowOf[i], REG_HEADERS.indexOf('상태') + 1).setValue(STATUS_CLOSED); } catch (e) { /* 다음에 다시 맞춰짐 */ }
+  });
   cachePut_(CACHE_LIST_KEY, list, 60);
   return list;
 }
@@ -541,7 +585,13 @@ function updateSurvey_(id, fields) {
   if (row < 2) throw new Error('설문을 찾을 수 없어요.');
   Object.keys(fields).forEach(function (h) {
     var col = REG_HEADERS.indexOf(h) + 1;
-    if (col > 0) sh.getRange(row, col).setValue(fields[h]);
+    if (col < 1) return;
+    var cell = sh.getRange(row, col);
+    if (h === '마감 예정') {
+      if (!String(sh.getRange(1, col).getValue() || '')) sh.getRange(1, col).setValue(h).setFontWeight('bold');
+      cell.setNumberFormat('@'); // 2026-11-01 23:59 가 날짜로 바뀌지 않게 글자로 저장
+    }
+    cell.setValue(fields[h]);
   });
   // 응답 수·마지막 응답만 바뀐 경우가 아니면(상태·제목 등) 목록 캐시를 바로 지운다
   if (Object.keys(fields).some(function (h) { return h !== '응답 수' && h !== '마지막 응답'; })) cacheDel_(CACHE_LIST_KEY);
@@ -596,8 +646,8 @@ function readTable_(sheet) {
  *   섹션 = { id, title, desc, blocks: [블록] }   → 응답 화면의 한 페이지
  *   블록
  *     choice    객관식        { id, label, options[], other, placeholder, mode: single|multi|rank, max }
- *     scale     5점 척도 묶음  { id, title, area, prefix, labels[5](1점→5점), posName, items[{short, text}] }
- *     timetable 시간표 과목평가 { id, area, labels[5], items[{key, text}], slots[], splitHint }  (설문당 1개)
+ *     scale     척도 묶음      { id, title, area, prefix, labels[3~7](1점→맨 끝 점수), posName, items[{short, text}] }
+ *     timetable 시간표 과목평가 { id, area, labels[3~7], items[{key, text}], slots[], splitHint }  (설문당 1개)
  *     text      서술형        { id, short, text, required }
  * 예전 형식(기본정보→만족도→시간표→서술형 고정 4단계)은 normalizeConfig_가 같은 ID·같은 열 이름으로 바꿔 준다
  * → 이미 쌓인 응답과 그대로 이어진다.
@@ -708,14 +758,14 @@ function validateBlock_(b, v, other) {
     if (b.other && hasOther_(v) && !String(other || '').trim()) return '"' + b.label + '" 기타 내용을 적어 주세요.';
   } else if (b.type === 'scale') {
     for (i = 0; i < b.items.length; i++) {
-      if (!validScore_(v && v[i])) return '"' + b.items[i].short + '" 문항에 응답해 주세요.';
+      if (!validScore_(v && v[i], b.labels.length)) return '"' + b.items[i].short + '" 문항에 응답해 주세요.';
     }
   } else if (b.type === 'timetable') {
     for (i = 0; i < b.slots.length; i++) {
       var s = b.slots[i], a = v && v[s.id];
       if (!a || a.choice == null || !s.options[a.choice]) return slotLabel_(s) + ': 수강한 분반을 선택해 주세요.';
       for (var j = 0; j < b.items.length; j++) {
-        if (!validScore_(a.scores && a.scores[b.items[j].key])) return slotLabel_(s) + ': 모든 문항에 응답해 주세요.';
+        if (!validScore_(a.scores && a.scores[b.items[j].key], b.labels.length)) return slotLabel_(s) + ': 모든 문항에 응답해 주세요.';
       }
     }
   } else if (b.type === 'text') {
@@ -724,8 +774,14 @@ function validateBlock_(b, v, other) {
   return '';
 }
 
-function validScore_(v) {
-  return v === 1 || v === 2 || v === 3 || v === 4 || v === 5;
+/** 1~n점 정수인지 (n = 그 척도의 점수 개수, 기본 5) */
+function validScore_(v, n) {
+  return typeof v === 'number' && v % 1 === 0 && v >= 1 && v <= (n || 5);
+}
+
+/** 척도 이름(점수 개수) 점검: 3~7개, 빈 이름 없음 */
+function scaleLabelsBad_(l) {
+  return !Array.isArray(l) || l.length < 3 || l.length > 7 || l.some(function (x) { return !String(x == null ? '' : x).trim(); });
 }
 
 /** 저장 전 점검. 비어 있는 값(영역 이름 등)은 여기서 채운다. */
@@ -750,7 +806,7 @@ function validateConfig_(cfg) {
         if ((e = col(b.label))) return e;
       } else if (b.type === 'scale') {
         if (!b.items || !b.items.length) return '"' + sec.title + '" 섹션의 척도 묶음에 문항이 없어요.';
-        if (!b.labels || b.labels.length !== 5) return '척도 이름은 5개여야 해요.';
+        if (scaleLabelsBad_(b.labels)) return '척도 이름은 3~7개를 쉼표로 적어 주세요. (5개면 5점 척도)';
         if (!b.prefix) b.prefix = b.title || sec.title;
         if (!b.area) b.area = b.prefix;
         if (areas[b.area]) return '척도 묶음 이름 "' + b.area + '"이(가) 겹쳐요. 묶음 이름을 서로 다르게 해 주세요.';
@@ -763,7 +819,7 @@ function validateConfig_(cfg) {
         if (++nT > 1) return '시간표 과목평가는 설문에 하나만 넣을 수 있어요.';
         if (!b.items || !b.items.length) return '시간표가 있으면 과목마다 묻는 문항이 1개 이상 필요해요.';
         if (!b.slots || !b.slots.length) return '시간표에 과목을 한 줄 이상 넣어 주세요.';
-        if (!b.labels || b.labels.length !== 5) return '척도 이름은 5개여야 해요.';
+        if (scaleLabelsBad_(b.labels)) return '척도 이름은 3~7개를 쉼표로 적어 주세요. (5개면 5점 척도)';
         if (!b.area) b.area = '과목평가';
         for (var t = 0; t < b.slots.length; t++) {
           if (!b.slots[t].options.length) return '시간표 ' + (t + 1) + '번째 줄에 과목이 없어요.';

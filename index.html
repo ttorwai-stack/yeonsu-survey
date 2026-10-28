@@ -66,10 +66,10 @@
   .warn { display: none; color: var(--danger); font-size: 13px; margin-top: 6px; }
   .missing > .warn, .q.missing .warn { display: block; }
 
-  /* 5점 척도 */
+  /* 3~7점 척도 (기본 5점) */
   /* 선형 척도: 위에 라벨, 아래 가로선 위의 동그라미 (왼쪽 = 가장 긍정) */
   .scale { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); }
-  .scale::before { content: ''; position: absolute; left: 10%; right: 10%; bottom: 15px; height: 2px; background: #c9ced6; }
+  .scale::before { content: ''; position: absolute; left: var(--ins, 10%); right: var(--ins, 10%); bottom: 15px; height: 2px; background: #c9ced6; }
   .opt { position: relative; }
   .opt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; z-index: 2; }
   .opt > span { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 8px; height: 100%; padding: 2px 1px 3px; cursor: pointer; text-align: center; }
@@ -81,6 +81,7 @@
   .opt input:checked + span .dot { border-color: var(--accent); transform: scale(1.08); background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5L20 7'/%3E%3C/svg%3E") center/15px no-repeat; }
   .opt input:checked + span .lbl { color: var(--accent-ink); font-weight: 700; }
   .scale.disabled { opacity: .35; pointer-events: none; }
+  .scale[data-n="6"] .lbl, .scale[data-n="7"] .lbl { font-size: 11px; }
 
   /* 선택지 칩 */
   .chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -353,11 +354,12 @@
   }
 
   /* ───── 렌더링 ───── */
-  // 왼쪽이 5점(예: 매우 그렇다), 오른쪽이 1점. 저장 값은 그대로 1~5.
+  // 왼쪽이 가장 높은 점수(예: 매우 그렇다), 오른쪽이 1점. 저장 값은 1~(척도 점수 개수).
   // 라벨은 다섯 개 모두 같은 굵기·색으로 (특정 선택지를 강조하면 응답이 쏠릴 수 있음)
   function scaleHTML(name, labels, val, disabled, unit) {
-    var h = '<div' + (unit ? ' data-unit' : '') + ' class="scale' + (disabled ? ' disabled' : '') + '" role="radiogroup">';
-    for (var v = 5; v >= 1; v--) {
+    var n = labels.length; // 3~7점 척도 (보통 5)
+    var h = '<div' + (unit ? ' data-unit' : '') + ' data-n="' + n + '" class="scale' + (disabled ? ' disabled' : '') + '" role="radiogroup" style="grid-template-columns:repeat(' + n + ',1fr);--ins:' + (50 / n) + '%">';
+    for (var v = n; v >= 1; v--) {
       h += '<label class="opt"><input type="radio" name="' + esc(name) + '" value="' + v + '" aria-label="' + esc(labels[v - 1]) + '"' + (val === v ? ' checked' : '') + (disabled ? ' disabled' : '') + '>' +
         '<span><span class="lbl">' + esc(labels[v - 1]) + '</span><span class="dot"></span></span></label>';
     }
