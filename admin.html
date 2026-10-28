@@ -228,7 +228,9 @@
     th { position: static; }
     .wrap { max-width: none; padding: 0; }
   }
-  .credit { margin: 28px 0 20px; padding: 0 16px; text-align: center; font-size: 11px; letter-spacing: .02em; color: var(--ink); opacity: .35; }
+  body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+  #root { flex: 1 0 auto; }
+  .credit { flex: none; margin: 0; padding: 28px 16px calc(16px + env(safe-area-inset-bottom)); text-align: center; font-size: 11px; letter-spacing: .02em; color: var(--ink); opacity: .35; }
 </style>
 </head>
 <body>
