@@ -149,6 +149,8 @@
   .credit { flex: none; padding: 20px 16px calc(14px + env(safe-area-inset-bottom)); text-align: center; font-size: 11px; letter-spacing: .02em; color: var(--ink); opacity: .35; }
   body:has(.nav) main { padding-bottom: 24px; }
   body:has(.nav) .credit { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+  /* 아이폰 사파리: 아래쪽 주소창에 가리지 않도록 더 띄운다 */
+  @supports (-webkit-touch-callout: none) { .credit { padding-bottom: calc(76px + env(safe-area-inset-bottom)); } }
 </style>
 </head>
 <body>

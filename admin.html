@@ -231,6 +231,8 @@
   body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
   #root { flex: 1 0 auto; }
   .credit { flex: none; margin: 0; padding: 28px 16px calc(16px + env(safe-area-inset-bottom)); text-align: center; font-size: 11px; letter-spacing: .02em; color: var(--ink); opacity: .35; }
+  /* 아이폰 사파리: 아래쪽 주소창에 가리지 않도록 더 띄운다 */
+  @supports (-webkit-touch-callout: none) { .credit { padding-bottom: calc(76px + env(safe-area-inset-bottom)); } }
 </style>
 </head>
 <body>
@@ -447,7 +449,10 @@
       '<div class="toolbar"><div class="grow"><h2>설문 ' + SURVEYS.length + '개</h2><div class="sub">진행 중 ' + nOpen + '개 · 설문마다 결과 시트가 드라이브 「연수 설문」 폴더에 따로 만들어져요</div></div>' +
       '<button class="btn" id="refresh">새로고침</button><button class="btn primary" id="new" aria-expanded="false">새 설문 만들기 ▾</button></div>' +
       '<div class="card new-menu" id="new-menu" hidden><b>어떤 틀로 시작할까요?</b> <span class="muted">만든 뒤 설정에서 섹션·문항을 자유롭게 바꿀 수 있어요. 지난 기수 설문을 이어 쓰려면 목록의 [복사해서 새로]가 편해요.</span><div class="acts" style="margin-top:10px">' +
-      '<button class="btn" data-tpl="post">사후설문 기본형</button><button class="btn" data-tpl="pre">사전설문 기본형</button><button class="btn" data-tpl="blank">빈 설문</button></div></div>';
+      '<button class="btn" data-tpl="post">사후설문 기본형</button><button class="btn" data-tpl="pre">사전설문 기본형</button><button class="btn" data-tpl="blank">빈 설문</button><button class="btn" id="paste-open">설정 붙여넣기</button></div>' +
+      '<div id="paste-panel" hidden style="margin-top:12px"><div class="muted" style="margin-bottom:6px">받은 설정 텍스트(<code>{</code> 로 시작)를 아래에 붙여넣으세요. 다른 설문의 [설정 복사]로 만든 텍스트도 돼요.</div>' +
+      '<textarea id="paste-cfg" rows="6" spellcheck="false" aria-label="설문 설정 붙여넣기" placeholder="여기에 붙여넣기" style="width:100%;padding:8px 10px;border:1px solid var(--axis);border-radius:8px;font:13px/1.5 ui-monospace,Menlo,Consolas,monospace"></textarea>' +
+      '<div class="acts" style="margin-top:8px"><button class="btn primary" id="paste-go">이 설정으로 만들기</button></div></div></div>';
     if (!SURVEYS.length) {
       h += '<div class="card empty">아직 만든 설문이 없어요.<br>[새 설문 만들기]를 누르거나, 다음 기수부터는 이전 설문을 [복사]해서 쓰면 돼요.</div>';
     } else {
@@ -469,6 +474,8 @@
     document.getElementById('refresh').onclick = loadList;
     document.getElementById('new').onclick = function () { var m = document.getElementById('new-menu'); m.hidden = !m.hidden; this.setAttribute('aria-expanded', String(!m.hidden)); };
     root.querySelectorAll('[data-tpl]').forEach(function (b) { b.onclick = function () { newSurvey(null, b, b.dataset.tpl); }; });
+    document.getElementById('paste-open').onclick = function () { var p = document.getElementById('paste-panel'); p.hidden = !p.hidden; if (!p.hidden) document.getElementById('paste-cfg').focus(); };
+    document.getElementById('paste-go').onclick = function () { pasteSurvey(this); };
     root.querySelectorAll('[data-act]').forEach(function (b) {
       b.onclick = function () {
         var id = b.dataset.id, act = b.dataset.act;
@@ -486,6 +493,34 @@
       toast(srcId ? '복사했어요. 제목·기수·시간표를 고쳐 주세요.' : '새 설문을 만들었어요. 내용을 채워 주세요.');
       openSurvey(r.id, 'cfg');
     }).catch(function (e) { btn.disabled = false; toast(errMsg(e)); renderList(); });
+  }
+
+  // 설정 텍스트 → 설문. 빈 설문을 만든 뒤 그 설정을 저장한다(서버가 한 번 더 점검).
+  function parseConfigText(txt) {
+    var s = String(txt || '').replace(/^\uFEFF/, '').replace(/```[a-z]*/gi, '').trim();
+    var a = s.indexOf('{'), z = s.lastIndexOf('}');
+    if (a < 0 || z < a) throw new Error('설정 텍스트가 아니에요. { 로 시작하는 텍스트를 붙여넣어 주세요.');
+    var c;
+    try { c = JSON.parse(s.slice(a, z + 1)); } catch (e) { throw new Error('붙여넣은 내용이 중간에 잘렸거나 글자가 바뀌었어요. 처음부터 끝까지 다시 복사해 주세요.'); }
+    if (!c || c.v !== 2 || !Array.isArray(c.sections) || !c.title) throw new Error('이 설문 시스템의 설정 텍스트가 아니에요.');
+    return c;
+  }
+  function pasteSurvey(btn) {
+    var cfg;
+    try { cfg = parseConfigText(document.getElementById('paste-cfg').value); } catch (e) { return toast(errMsg(e)); }
+    btn.disabled = true; btn.textContent = '만드는 중…';
+    var made = null;
+    api('createSurvey', KEY, null, 'blank').then(function (r) {
+      made = r.id;
+      return api('saveConfig', KEY, r.id, cfg);
+    }).then(function () {
+      toast('만들었어요. 내용을 확인하고 [응답 화면 열기]로 점검해 보세요.');
+      openSurvey(made, 'cfg', true);
+    }).catch(function (e) {
+      btn.disabled = false; btn.textContent = '이 설정으로 만들기';
+      toast(errMsg(e) + (made ? ' (빈 설문이 하나 만들어졌어요. 목록에서 확인해 주세요.)' : ''));
+      if (made) loadList();
+    });
   }
 
   function toggleStatus(id, btn) {
@@ -1167,7 +1202,7 @@
   function drawConfig() {
     var c = W, body = document.getElementById('body'), tt = hasTimetable();
     var h = '<div class="toolbar"><div class="grow"><h2>설문 설정</h2><div class="sub">섹션 = 응답 화면의 한 페이지. 섹션 안에 문항을 원하는 종류·순서로 넣고 ▲▼로 순서를 바꿔요. [저장]을 눌러야 반영돼요.</div></div>' +
-      '<a class="btn" id="preview" target="_blank" rel="noopener">응답 화면 열기</a><button class="btn" id="qform2" title="저장된 설정 기준">설문지 PDF</button><button class="btn primary" id="save">저장</button></div>';
+      '<a class="btn" id="preview" target="_blank" rel="noopener">응답 화면 열기</a><button class="btn" id="cfg-copy" title="저장된 설정을 텍스트로 복사 (다른 설문·다른 관리자에게 [설정 붙여넣기]로 쓸 수 있어요)">설정 복사</button><button class="btn" id="qform2" title="저장된 설정 기준">설문지 PDF</button><button class="btn primary" id="save">저장</button></div>';
     h += stepCard('', '첫 화면 · 마무리', '설문 맨 위에 보이는 제목·안내와 제출 후 감사 메시지', '<div class="form">' +
       field('title', '설문 제목', c.title) + field('course', '과정명', c.course) + field('cohort', '기수 (선택)', c.cohort, '같은 과정을 여러 기수로 운영할 때만 적어요 (예: 4기). 비우면 응답 화면에 기수가 나오지 않아요.') +
       field('period', '연수 기간', c.period) + area('intro', '안내 문구', c.intro, 5, '줄을 바꾸면 응답 화면에서도 그대로 줄이 바뀌어요.') +
@@ -1189,6 +1224,12 @@
     document.getElementById('preview').href = surveyUrl(CUR);
     document.getElementById('save').onclick = saveCfg;
     document.getElementById('qform2').onclick = openQuestionnaire;
+    document.getElementById('cfg-copy').onclick = function () {
+      var txt = JSON.stringify(D.config);
+      Promise.resolve().then(function () { return navigator.clipboard.writeText(txt); })
+        .then(function () { toast('저장된 설정을 복사했어요. 새 설문의 [설정 붙여넣기]에 붙여넣으면 돼요.'); })
+        .catch(function () { prompt('아래 내용을 전체 복사하세요', txt); });
+    };
     document.getElementById('add-sec').onclick = function () {
       collect();
       W.sections.push({ id: newId('sec'), title: '새 섹션', desc: '', blocks: [] });

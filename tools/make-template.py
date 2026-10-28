@@ -27,12 +27,14 @@ files['Code.gs'] = sub_once(read('server/Code.gs'), r"var PAGES_BASE = '[^']*';"
                             "var PAGES_BASE = 'https://YOUR-ID.github.io/YOUR-REPO/';", 'PAGES_BASE')
 files['MANUAL.html'] = read('template/MANUAL.html')
 files['README.md'] = read('template/README.md')
+for sp in sorted((ROOT / 'template' / 'samples').glob('*.json')):
+    files['samples/' + sp.name] = sp.read_text(encoding='utf-8')
 
 # 점검: 내 주소가 남아 있지 않아야 하고, 제작 표시는 모든 파일에 있어야 한다
 for n, t in files.items():
     for bad in ('ttorwai', 'AKfycbyUUAH8'):
         if bad in t: sys.exit('%s 에 내 정보(%s)가 남아 있어요' % (n, bad))
-    if CREDIT not in t: sys.exit('%s 에 제작 표시가 없어요' % n)
+    if CREDIT not in t and not n.endswith('.json'): sys.exit('%s 에 제작 표시가 없어요' % n)
 
 DIST.mkdir(exist_ok=True)
 out = DIST / 'yeonsu-survey-template.zip'
