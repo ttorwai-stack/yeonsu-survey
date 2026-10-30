@@ -184,7 +184,7 @@ function getAppUrl() {
 var API_ACTIONS = {
   listOpenSurveys: listOpenSurveys, getSurvey: getSurvey, submitResponse: submitResponse,
   verifyKey: verifyKey, listSurveys: listSurveys, createSurvey: createSurvey,
-  setSurveyStatus: setSurveyStatus, getResults: getResults, saveConfig: saveConfig, setCloseAt: setCloseAt
+  setSurveyStatus: setSurveyStatus, getResults: getResults, saveConfig: saveConfig, setCloseAt: setCloseAt, deleteSurvey: deleteSurvey
 };
 
 function doPost(e) {
@@ -429,6 +429,32 @@ function setSurveyStatus(key, id, status) {
   if (status === STATUS_OPEN && m && isDue_(m.closeAt)) fields['마감 예정'] = '';
   updateSurvey_(id, fields);
   return { ok: true };
+}
+
+/**
+ * 설문 삭제. 마감된 설문만 지울 수 있다(진행 중인 설문을 실수로 지우지 않게).
+ * 결과 시트는 드라이브 휴지통으로 옮기므로 30일 안에는 복구할 수 있다. 목록(설문목록 시트)에서는 줄을 지운다.
+ */
+function deleteSurvey(key, id) {
+  requireKey_(key);
+  var m = findSurvey_(id);
+  if (!m) throw new Error('설문을 찾을 수 없어요.');
+  if (m.status !== STATUS_CLOSED) throw new Error('진행 중인 설문은 삭제할 수 없어요. 먼저 [마감하기]를 눌러 주세요.');
+  var trashed = false;
+  try {
+    DriveApp.getFileById(m.sheetId).setTrashed(true);
+    trashed = true;
+  } catch (e) {
+    // 시트를 이미 지웠거나 못 찾는 경우는 목록에서만 지운다. 그 밖의 오류(권한 등)는 멈춘다.
+    if (!/not found|찾을 수 없|No item|존재하지/i.test(String((e && e.message) || e))) throw new Error('결과 시트를 드라이브 휴지통으로 옮기지 못했어요: ' + ((e && e.message) || e));
+  }
+  var sh = registry_();
+  var ids = sh.getRange(1, 1, sh.getLastRow(), 1).getValues().map(function (r) { return String(r[0]); });
+  var row = ids.indexOf(String(id)) + 1;
+  if (row >= 2) sh.deleteRow(row);
+  cacheDel_(CACHE_LIST_KEY);
+  cacheDel_('svy-cfg-' + m.sheetId);
+  return { ok: true, trashed: trashed };
 }
 
 /** 자동 마감 시각 예약. closeAt = "yyyy-MM-dd HH:mm"(한국 시간). 빈 값이면 예약 해제. */
