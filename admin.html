@@ -212,8 +212,11 @@
   .rp-tbl .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .rp-tbl tr { break-inside: avoid; page-break-inside: avoid; }
   .rp-keep { break-inside: avoid; page-break-inside: avoid; }
-  .rp-demo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 14px; }
-  .rp-demo-i { break-inside: avoid; page-break-inside: avoid; }
+  .rp-demo { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 14px; }
+  .rp-demo-i { break-inside: avoid; page-break-inside: avoid; border: 1px solid #e3e1da; border-radius: 8px; padding: 9px 11px 3px; }
+  .rp-demo-i h4 { font-size: 13px; margin-bottom: 2px; }
+  .rp-venn { display: block; width: 100%; height: auto; margin: 0 0 4px; }
+  .rp-demo-i .rp-tbl { margin: 2px 0 8px; }
   .rp-cnt { font-weight: 400; color: #666; font-size: 11.5px; }
   .rp-open { margin: 4px 0 10px; padding-left: 20px; }
   .rp-open li { margin: 0 0 5px; white-space: pre-wrap; break-inside: avoid; page-break-inside: avoid; }
@@ -1063,6 +1066,61 @@
     return url;
   }
 
+  /* 기본 정보용 비례 원 다이어그램(벤다이어그램 느낌): 원 면적 = 응답 수, 서로 살짝 겹치게 모아 배치한다.
+   * 작은 원은 이름을 원 밖에 적는다. 결과는 SVG라서 PDF로 저장해도 선명하다. */
+  var VENN_COL = ['#2a78d6', '#1baf7a', '#eda100', '#d65a8a', '#7a5bd6', '#2fa8c2', '#d9702e', '#8a8f98'];
+  function vennSvg(R) {
+    var W = 330, H = 178, items = R.entries.filter(function (e) { return e[1] > 0; }).map(function (e) { return { n: String(e[0]), v: e[1], pct: rateOf(R, e[1]) }; });
+    if (!items.length) return '';
+    items.sort(function (a, z) { return z.v - a.v; });
+    if (items.length > 8) {
+      if (R.mode === 'multi') items = items.slice(0, 8); // 복수 선택은 합치면 사람 수가 겹쳐 세어지므로 상위 8개만
+      else { var rest = items.slice(7), sum = rest.reduce(function (a, x) { return a + x.v; }, 0); items = items.slice(0, 7); items.push({ n: '그 외 ' + rest.length + '개', v: sum, pct: rateOf(R, sum) }); }
+    }
+    // 가장 큰 원을 가운데에 두고 좌우로 번갈아 작은 원을 잇는다(종 모양). 이웃 원은 일정하게 살짝 겹친다.
+    var order = [];
+    items.forEach(function (it, i) { it.r = Math.sqrt(it.v / items[0].v); /* 면적 ∝ 응답 수 */ if (i % 2) order.unshift(it); else order.push(it); });
+    order.forEach(function (c, i) { c.x = i ? order[i - 1].x + (order[i - 1].r + c.r) * 0.84 : 0; c.y = 0; c.k = i; });
+    var x0 = 1e9, x1 = -1e9;
+    order.forEach(function (c) { x0 = Math.min(x0, c.x - c.r); x1 = Math.max(x1, c.x + c.r); });
+    var anySmall = order.some(function (c) { return c.r < 0.45; }), padX = 12, padY = anySmall ? 30 : 12;
+    var s = Math.min((W - 2 * padX) / (x1 - x0), (H - 2 * padY) / 2, H * 0.4);
+    var ox = W / 2 - (x0 + x1) / 2 * s, oy = H / 2;
+    order.forEach(function (c) { c.px = c.x * s + ox; c.py = oy; c.pr = c.r * s; });
+    var trunc = function (str, n) { return str.length > n ? str.slice(0, Math.max(1, n - 1)) + '…' : str; };
+    var svg = '<svg class="rp-venn" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="' + esc(R.b.label) + ' 응답 비율 다이어그램" font-family="Pretendard Variable, Pretendard, Malgun Gothic, sans-serif">';
+    // 큰 원부터 그려서 작은 원이 위에 보이게
+    items.forEach(function (c) { var col = VENN_COL[items.indexOf(c) % VENN_COL.length]; svg += '<circle cx="' + c.px.toFixed(1) + '" cy="' + c.py.toFixed(1) + '" r="' + c.pr.toFixed(1) + '" fill="' + col + '" fill-opacity=".5" stroke="' + col + '" stroke-width="1.6"/>'; });
+    order.forEach(function (c) {
+      if (c.pr >= 25) {
+        // 이름은 원 너비에 맞춰 띄어쓰기 단위로 최대 두 줄, 숫자는 한 줄(좁은 원은 두 줄)
+        var chars = Math.max(3, Math.floor(c.pr * 1.8 / 9.5)), words = c.n.split(' '), nl = [], cur = '';
+        words.forEach(function (w) { if (cur && (cur + ' ' + w).length > chars) { nl.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; });
+        nl.push(cur);
+        if (nl.length > 2) nl = [nl[0], trunc(nl.slice(1).join(' '), chars + 2)];
+        var maxLen = Math.max.apply(null, nl.map(function (x) { return x.length; }));
+        var fs = Math.max(8.5, Math.min(11.5, c.pr * 1.75 / maxLen)), fs2 = Math.min(10, fs);
+        var st = c.pr < 34 ? [c.v + '명', c.pct] : [c.v + '명 · ' + c.pct];
+        var rows = nl.map(function (x) { return [x, 1]; }).concat(st.map(function (x) { return [x, 0]; }));
+        var lh = fs + 1.8, y0 = c.py - (rows.length - 1) * lh / 2 + fs * 0.32;
+        rows.forEach(function (rw, i) {
+          svg += '<text x="' + c.px.toFixed(1) + '" y="' + (y0 + i * lh).toFixed(1) + '" text-anchor="middle" font-size="' + (rw[1] ? fs : fs2).toFixed(1) + '"' + (rw[1] ? ' font-weight="700" fill="#111"' : ' fill="#222"') + '>' + esc(rw[0]) + '</text>';
+        });
+      } else {
+        // 작은 원은 이름을 원 위/아래에(번갈아) 적는다. 좌우 끝에서 잘리지 않게 안쪽으로 당긴다.
+        var label = trunc(c.n, 9) + ' ' + c.v + '명 · ' + c.pct, lw = label.split('').reduce(function (a, ch) { return a + (ch.charCodeAt(0) > 255 ? 10.8 : 5.9); }, 6); // 한글은 폭이 넓다
+        var lx = Math.max(lw / 2 + 2, Math.min(W - lw / 2 - 2, c.px)), up = c.k % 2 === 0, ly = up ? c.py - c.pr - 6 : c.py + c.pr + 13;
+        if (Math.abs(lx - c.px) > 1) { // 끝으로 밀려 이웃 원 위에 걸치면, 가장 큰 원보다 바깥으로 빼고 가는 선으로 잇는다
+          var maxPr = Math.max.apply(null, order.map(function (o) { return o.pr; }));
+          ly = up ? c.py - maxPr - 6 : c.py + maxPr + 14;
+          svg += '<line x1="' + c.px.toFixed(1) + '" y1="' + (up ? c.py - c.pr : c.py + c.pr).toFixed(1) + '" x2="' + c.px.toFixed(1) + '" y2="' + (up ? ly + 3 : ly - 10).toFixed(1) + '" stroke="#888" stroke-width=".8"/>';
+        }
+        svg += '<text x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="middle" font-size="10.5" fill="#111" stroke="#fff" stroke-width="3" paint-order="stroke">' + esc(label) + '</text>';
+      }
+    });
+    return svg + '</svg>';
+  }
+
   function rpFig(url, caption) { return '<div class="rp-fig"><img src="' + url + '" alt="' + esc(caption || '') + '">' + (caption ? '<div class="rp-cap">' + esc(caption) + '</div>' : '') + '</div>'; }
   function rpTable(head, rows, numCols) {
     numCols = numCols || [];
@@ -1090,7 +1148,7 @@
     // 섹션 순서대로
     c.sections.forEach(function (sec) {
       var parts = '', small = [];
-      var flush = function () { if (small.length) { parts += '<div class="rp-demo">' + small.join('') + '</div>'; small = []; } };
+      var flush = function () { if (small.length) { parts += '<div class="rp-demo">' + small.join('') + '</div><div class="rp-cap">※ 원의 면적은 응답 수에 비례해요. 표에는 전체 응답이 있어요.</div>'; small = []; } };
       sec.blocks.forEach(function (b) {
         var R = S.res[b.id];
         if (b.type === 'choice') {
@@ -1102,7 +1160,7 @@
               rpTable(['순위', '항목'].concat(R.rows[0].r.map(function (_, i) { return (i + 1) + '순위'; })).concat(['점수']),
                 R.rows.map(function (x, i) { return [i + 1, x.opt].concat(x.r).concat([x.score]); }), R.rows[0].r.map(function (_, i) { return i + 2; }).concat([R.K + 2]));
           } else {
-            small.push('<div class="rp-demo-i"><h4>' + esc(b.label) + (R.mode === 'multi' ? ' <span class="rp-cnt">(복수 선택)</span>' : '') + '</h4>' +
+            small.push('<div class="rp-demo-i"><h4>' + esc(b.label) + (R.mode === 'multi' ? ' <span class="rp-cnt">(복수 선택)</span>' : '') + '</h4>' + vennSvg(R) +
               rpTable(['구분', '명', R.mode === 'multi' ? '응답자 대비' : '비율'], R.entries.map(function (e) { return [e[0], e[1], rateOf(R, e[1])]; }), [1, 2]) + '</div>');
           }
           return;
