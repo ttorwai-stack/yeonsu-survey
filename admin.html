@@ -70,7 +70,7 @@
   .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--ink-2); margin: 0 0 8px; }
   .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
   .sec { font-size: 18px; font-weight: 700; margin: 26px 0 10px; }
-  .minis { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .minis { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 12px; }
   .minis .card { margin: 0; padding: 14px; }
   .minis h4 { margin: 0 0 2px; font-size: 13.5px; }
   .minis .m { font-size: 12px; color: var(--ink-3); margin-bottom: 6px; }
@@ -212,10 +212,23 @@
   .rp-tbl .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .rp-tbl tr { break-inside: avoid; page-break-inside: avoid; }
   .rp-keep { break-inside: avoid; page-break-inside: avoid; }
+  /* 보고서도 결과 화면과 같은 카드·타일·섹션 제목 모양을 쓴다 (A4 폭에 맞게 열 수만 조정) */
+  #report .kpis { grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0 6px; }
+  #report .kpi { padding: 10px 12px; } #report .kpi .v { font-size: 24px; }
+  #report .sec { font-size: 16px; margin: 24px 0 10px; padding-bottom: 5px; border-bottom: 1.5px solid #333; break-after: avoid; page-break-after: avoid; }
+  #report .minis { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 12px; }
+  #report .card { margin-bottom: 10px; padding: 12px 14px; }
+  #report .minis .card { margin: 0; }
+  #report .card-h h3, #report .card-h h4 { margin: 0; font-size: 13.5px; }
+  #report .open-list { max-height: none; overflow: visible; }
+  #report .open-q { break-inside: auto; page-break-inside: auto; }
+  #report .rp-img { display: block; width: 100%; height: auto; }
+  #report .legend { margin: 0 0 6px; }
+  .ct { font-size: 12.5px; margin-top: 4px; } .ct th, .ct td { padding: 5px 8px; }
   .rp-demo { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 14px; }
   .rp-demo-i { break-inside: avoid; page-break-inside: avoid; border: 1px solid #e3e1da; border-radius: 8px; padding: 9px 11px 3px; }
   .rp-demo-i h4 { font-size: 13px; margin-bottom: 2px; }
-  .rp-venn { display: block; width: 100%; height: auto; margin: 0 0 4px; }
+  .rp-pie { display: block; width: 100%; max-width: 360px; height: auto; margin: 0 auto 4px; }
   .rp-demo-i .rp-tbl { margin: 2px 0 8px; }
   .rp-cnt { font-weight: 400; color: #666; font-size: 11.5px; }
   .rp-open { margin: 4px 0 10px; padding-left: 20px; }
@@ -810,11 +823,7 @@
       (cs.length > 1 ? '<select id="cohort" aria-label="기수 선택">' + cs.map(function (x) { return '<option value="' + esc(x) + '"' + (x === cohort ? ' selected' : '') + '>' + esc(x || '기수 없음') + '</option>'; }).join('') + '</select>' : '') +
       '<button class="btn" id="reload">새로고침</button><button class="btn" id="qform">설문지 PDF</button><button class="btn" id="print">보고서 PDF</button><button class="btn primary" id="xlsx">엑셀 다운로드</button></div>';
 
-    var sr = S.scaleRes.filter(function (R) { return R.items.length; });
-    h += '<div class="kpis">' + kpi('응답자', S.n, '명', '') +
-      (sr[0] ? kpi(sr[0].items[0].item, f2(sr[0].items[0].mean), '/ ' + sr[0].N, sr[0].pos + ' ' + pct(sr[0].items[0].top2)) : '') +
-      sr.map(function (R) { return kpi(R.name + ' 평균', f2(R.all.mean), '/ ' + R.N, R.items.length + '개 지표 · ' + R.pos + ' ' + pct(R.all.top2)); }).join('') +
-      agg.map(function (a) { return kpi('과목 ' + a.k + ' 평균', f2(a.s.mean), '/ ' + (S.cn || 5), S.courses.length + '개 과목 · 만족 비율 ' + pct(a.s.top2)); }).join('') + '</div>';
+    h += kpiHTML(S, agg);
 
     // 섹션 순서대로: 객관식은 작은 카드 묶음, 서술형은 두 칸, 척도·시간표는 넓은 카드
     var draws = [], nCh = 0, nSc = 0;
@@ -830,9 +839,11 @@
           if (!R.base) return;
           if (pendType !== 'choice') flush();
           pendType = 'choice';
-          var cid = 'c-ch' + (nCh++);
-          pend.push(choiceCard(R, cid));
-          draws.push(function () { drawChoice(R, cid); });
+          if (R.mode === 'rank') {
+            var cid = 'c-ch' + (nCh++);
+            pend.push(choiceCard(R, cid));
+            draws.push(function () { drawChoice(R, cid); });
+          } else pend.push(choicePieCard(R));
         } else if (b.type === 'text') {
           if (pendType !== 'text') flush();
           pendType = 'text';
@@ -885,6 +896,11 @@
     if (R.mode === 'rank') h += '<div class="tbl-wrap"><table class="rank-tbl"><thead><tr><th>순위</th><th>항목</th>' + R.rows[0].r.map(function (_, i) { return '<th class="num">' + (i + 1) + '순위</th>'; }).join('') + '<th class="num">점수</th></tr></thead><tbody>' +
       R.rows.map(function (x, i) { return '<tr><td>' + (i + 1) + '</td><td>' + esc(x.opt) + '</td>' + x.r.map(function (v) { return '<td class="num">' + v + '</td>'; }).join('') + '<td class="num"><b>' + x.score + '</b></td></tr>'; }).join('') + '</tbody></table></div>';
     return h + '</div>';
+  }
+  function choicePieCard(R) {
+    return '<div class="card"><div class="card-h"><div><h4>' + esc(R.b.label) + '</h4><div class="m">' + esc(choiceSub(R)) + '</div></div></div>' + pieSvg(R) +
+      '<div class="tbl-wrap"><table class="ct"><thead><tr><th>구분</th><th class="num">명</th><th class="num">' + (R.mode === 'multi' ? '응답자 대비' : '비율') + '</th></tr></thead><tbody>' +
+      R.entries.map(function (e) { return '<tr><td>' + esc(e[0]) + '</td><td class="num">' + e[1] + '</td><td class="num">' + rateOf(R, e[1]) + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
   }
   function choiceChartCfg(R, fixed) {
     return {
@@ -946,19 +962,20 @@
     };
   }
   function drawScale(R, id) { charts.push(new Chart(document.getElementById(id), scaleChartCfg(R, false))); }
+  function scaleMiniCfg(R, o, fixed) {
+    return {
+      type: 'bar',
+      data: { labels: zeros(R.N).map(function (_, i) { return [String(i + 1), R.labels[i] || '']; }), datasets: [{ data: o.counts, backgroundColor: likCols(R.N), borderRadius: 4, borderSkipped: 'start', maxBarThickness: 34 }] },
+      options: {
+        maintainAspectRatio: false,
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#e1e0d9' } }, x: { grid: { display: false }, ticks: { font: { size: 10.5 } } } },
+        plugins: { legend: { display: false }, tooltip: { enabled: !fixed, callbacks: { title: function (x) { return x[0].label.replace(',', '점 '); }, label: function (x) { return ' ' + x.parsed.y + '명 (' + (o.n ? (x.parsed.y / o.n * 100).toFixed(1) : 0) + '%)'; } } } }
+      },
+      plugins: [whiteBg]
+    };
+  }
   function drawScaleMinis(R, id) {
-    R.items.forEach(function (o, i) {
-      charts.push(new Chart(document.getElementById(id + '-m' + i), {
-        type: 'bar',
-        data: { labels: zeros(R.N).map(function (_, i) { return [String(i + 1), R.labels[i] || '']; }), datasets: [{ data: o.counts, backgroundColor: likCols(R.N), borderRadius: 4, borderSkipped: 'start', maxBarThickness: 34 }] },
-        options: {
-          maintainAspectRatio: false,
-          scales: { y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: '#e1e0d9' } }, x: { grid: { display: false }, ticks: { font: { size: 10.5 } } } },
-          plugins: { legend: { display: false }, tooltip: { callbacks: { title: function (x) { return x[0].label.replace(',', '점 '); }, label: function (x) { return ' ' + x.parsed.y + '명 (' + (o.n ? (x.parsed.y / o.n * 100).toFixed(1) : 0) + '%)'; } } } }
-        },
-        plugins: [whiteBg]
-      }));
-    });
+    R.items.forEach(function (o, i) { charts.push(new Chart(document.getElementById(id + '-m' + i), scaleMiniCfg(R, o, false))); });
   }
 
   function courseCards(S) {
@@ -974,6 +991,13 @@
       '</tr></thead><tbody></tbody></table></div></div>';
   }
 
+  function kpiHTML(S, agg) {
+    var sr = S.scaleRes.filter(function (R) { return R.items.length; });
+    return '<div class="kpis">' + kpi('응답자', S.n, '명', '') +
+      (sr[0] ? kpi(sr[0].items[0].item, f2(sr[0].items[0].mean), '/ ' + sr[0].N, sr[0].pos + ' ' + pct(sr[0].items[0].top2)) : '') +
+      sr.map(function (R) { return kpi(R.name + ' 평균', f2(R.all.mean), '/ ' + R.N, R.items.length + '개 지표 · ' + R.pos + ' ' + pct(R.all.top2)); }).join('') +
+      agg.map(function (a) { return kpi('과목 ' + a.k + ' 평균', f2(a.s.mean), '/ ' + (S.cn || 5), S.courses.length + '개 과목 · 만족 비율 ' + pct(a.s.top2)); }).join('') + '</div>';
+  }
   function kpi(k, v, unit, s) { return '<div class="kpi"><div class="k">' + esc(k) + '</div><div class="v">' + esc(v) + '<small>' + esc(unit) + '</small></div>' + (s ? '<div class="s">' + esc(s) + '</div>' : '') + '</div>'; }
 
   function courseLabel(c) { return c.date + ' ' + c.time + ' ' + c.title + ' (' + String(c.inst).split(/\s+/).pop() + ')'; }
@@ -1066,59 +1090,47 @@
     return url;
   }
 
-  /* 기본 정보용 비례 원 다이어그램(벤다이어그램 느낌): 원 면적 = 응답 수, 서로 살짝 겹치게 모아 배치한다.
-   * 작은 원은 이름을 원 밖에 적는다. 결과는 SVG라서 PDF로 저장해도 선명하다. */
-  var VENN_COL = ['#2a78d6', '#1baf7a', '#eda100', '#d65a8a', '#7a5bd6', '#2fa8c2', '#d9702e', '#8a8f98'];
-  function vennSvg(R) {
-    var W = 330, H = 178, items = R.entries.filter(function (e) { return e[1] > 0; }).map(function (e) { return { n: String(e[0]), v: e[1], pct: rateOf(R, e[1]) }; });
+  /* 기본 정보용 원 그래프(파이): 12시 방향에서 시계 방향으로, 선택지 순서대로 조각을 나눈다.
+   * 큰 조각은 안에 이름·비율을, 작은 조각은 밖에 선으로 이어 적는다. SVG라서 PDF로 저장해도 선명하다. */
+  var PIE_COL = ['#2a78d6', '#1f9d6b', '#e0a01e', '#d65a8a', '#7a5bd6', '#2fa8c2', '#d9702e', '#8a8f98'];
+  function pieSvg(R) {
+    var W = 330, H = 212, cx = W / 2, cy = 108, RAD = 70, multi = R.mode === 'multi';
+    var items = R.entries.filter(function (e) { return e[1] > 0; }).map(function (e) { return { n: String(e[0]), v: e[1] }; });
     if (!items.length) return '';
-    items.sort(function (a, z) { return z.v - a.v; });
-    if (items.length > 8) {
-      if (R.mode === 'multi') items = items.slice(0, 8); // 복수 선택은 합치면 사람 수가 겹쳐 세어지므로 상위 8개만
-      else { var rest = items.slice(7), sum = rest.reduce(function (a, x) { return a + x.v; }, 0); items = items.slice(0, 7); items.push({ n: '그 외 ' + rest.length + '개', v: sum, pct: rateOf(R, sum) }); }
+    if (items.length > 8) { // 선택지가 많으면 작은 것을 "그 외"로 묶는다. (복수 선택은 사람이 겹쳐 세어지므로 묶지 않고 상위 8개만)
+      var byV = items.slice().sort(function (p, q) { return q.v - p.v; }), keep = byV.slice(0, 7);
+      if (multi) { items = items.filter(function (x) { return byV.slice(0, 8).indexOf(x) >= 0; }); }
+      else { var rest = byV.slice(7), other = { n: '그 외 ' + rest.length + '개', v: rest.reduce(function (s, x) { return s + x.v; }, 0) }; items = items.filter(function (x) { return keep.indexOf(x) >= 0; }); items.push(other); }
     }
-    // 가장 큰 원을 가운데에 두고 좌우로 번갈아 작은 원을 잇는다(종 모양). 이웃 원은 일정하게 살짝 겹친다.
-    var order = [];
-    items.forEach(function (it, i) { it.r = Math.sqrt(it.v / items[0].v); /* 면적 ∝ 응답 수 */ if (i % 2) order.unshift(it); else order.push(it); });
-    order.forEach(function (c, i) { c.x = i ? order[i - 1].x + (order[i - 1].r + c.r) * 0.84 : 0; c.y = 0; c.k = i; });
-    var x0 = 1e9, x1 = -1e9;
-    order.forEach(function (c) { x0 = Math.min(x0, c.x - c.r); x1 = Math.max(x1, c.x + c.r); });
-    var anySmall = order.some(function (c) { return c.r < 0.45; }), padX = 12, padY = anySmall ? 30 : 12;
-    var s = Math.min((W - 2 * padX) / (x1 - x0), (H - 2 * padY) / 2, H * 0.4);
-    var ox = W / 2 - (x0 + x1) / 2 * s, oy = H / 2;
-    order.forEach(function (c) { c.px = c.x * s + ox; c.py = oy; c.pr = c.r * s; });
+    var total = items.reduce(function (s, x) { return s + x.v; }, 0);
     var trunc = function (str, n) { return str.length > n ? str.slice(0, Math.max(1, n - 1)) + '…' : str; };
-    var svg = '<svg class="rp-venn" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="' + esc(R.b.label) + ' 응답 비율 다이어그램" font-family="Pretendard Variable, Pretendard, Malgun Gothic, sans-serif">';
-    // 큰 원부터 그려서 작은 원이 위에 보이게
-    items.forEach(function (c) { var col = VENN_COL[items.indexOf(c) % VENN_COL.length]; svg += '<circle cx="' + c.px.toFixed(1) + '" cy="' + c.py.toFixed(1) + '" r="' + c.pr.toFixed(1) + '" fill="' + col + '" fill-opacity=".5" stroke="' + col + '" stroke-width="1.6"/>'; });
-    order.forEach(function (c) {
-      if (c.pr >= 25) {
-        // 이름은 원 너비에 맞춰 띄어쓰기 단위로 최대 두 줄, 숫자는 한 줄(좁은 원은 두 줄)
-        var chars = Math.max(3, Math.floor(c.pr * 1.8 / 9.5)), words = c.n.split(' '), nl = [], cur = '';
-        words.forEach(function (w) { if (cur && (cur + ' ' + w).length > chars) { nl.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; });
-        nl.push(cur);
-        if (nl.length > 2) nl = [nl[0], trunc(nl.slice(1).join(' '), chars + 2)];
-        var maxLen = Math.max.apply(null, nl.map(function (x) { return x.length; }));
-        var fs = Math.max(8.5, Math.min(11.5, c.pr * 1.75 / maxLen)), fs2 = Math.min(10, fs);
-        var st = c.pr < 34 ? [c.v + '명', c.pct] : [c.v + '명 · ' + c.pct];
-        var rows = nl.map(function (x) { return [x, 1]; }).concat(st.map(function (x) { return [x, 0]; }));
-        var lh = fs + 1.8, y0 = c.py - (rows.length - 1) * lh / 2 + fs * 0.32;
-        rows.forEach(function (rw, i) {
-          svg += '<text x="' + c.px.toFixed(1) + '" y="' + (y0 + i * lh).toFixed(1) + '" text-anchor="middle" font-size="' + (rw[1] ? fs : fs2).toFixed(1) + '"' + (rw[1] ? ' font-weight="700" fill="#111"' : ' fill="#222"') + '>' + esc(rw[0]) + '</text>';
-        });
-      } else {
-        // 작은 원은 이름을 원 위/아래에(번갈아) 적는다. 좌우 끝에서 잘리지 않게 안쪽으로 당긴다.
-        var label = trunc(c.n, 9) + ' ' + c.v + '명 · ' + c.pct, lw = label.split('').reduce(function (a, ch) { return a + (ch.charCodeAt(0) > 255 ? 10.8 : 5.9); }, 6); // 한글은 폭이 넓다
-        var lx = Math.max(lw / 2 + 2, Math.min(W - lw / 2 - 2, c.px)), up = c.k % 2 === 0, ly = up ? c.py - c.pr - 6 : c.py + c.pr + 13;
-        if (Math.abs(lx - c.px) > 1) { // 끝으로 밀려 이웃 원 위에 걸치면, 가장 큰 원보다 바깥으로 빼고 가는 선으로 잇는다
-          var maxPr = Math.max.apply(null, order.map(function (o) { return o.pr; }));
-          ly = up ? c.py - maxPr - 6 : c.py + maxPr + 14;
-          svg += '<line x1="' + c.px.toFixed(1) + '" y1="' + (up ? c.py - c.pr : c.py + c.pr).toFixed(1) + '" x2="' + c.px.toFixed(1) + '" y2="' + (up ? ly + 3 : ly - 10).toFixed(1) + '" stroke="#888" stroke-width=".8"/>';
-        }
-        svg += '<text x="' + lx.toFixed(1) + '" y="' + ly.toFixed(1) + '" text-anchor="middle" font-size="10.5" fill="#111" stroke="#fff" stroke-width="3" paint-order="stroke">' + esc(label) + '</text>';
+    var wrap = function (str, n) { // 띄어쓰기 단위로 줄을 나눈다
+      var out = [], cur = '';
+      str.split(' ').forEach(function (w) { if (cur && (cur + ' ' + w).length > n) { out.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; });
+      out.push(cur);
+      return out.length > 2 ? [out[0], trunc(out.slice(1).join(' '), n + 2)] : out;
+    };
+    var lum = function (hex) { var n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
+    var pt = function (ang, r) { return [cx + r * Math.cos(ang), cy + r * Math.sin(ang)]; };
+    var svg = '<svg class="rp-pie" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="' + esc(R.b.label) + ' 응답 비율 원 그래프" font-family="Pretendard Variable, Pretendard, Malgun Gothic, sans-serif">', labels = '', a0 = -Math.PI / 2;
+    items.forEach(function (it, i) {
+      var col = PIE_COL[i % PIE_COL.length], frac = it.v / total, a1 = a0 + frac * 2 * Math.PI, mid = (a0 + a1) / 2;
+      if (items.length === 1) svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + RAD + '" fill="' + col + '" stroke="#fff" stroke-width="1.5"/>';
+      else { var p0 = pt(a0, RAD), p1 = pt(a1, RAD); svg += '<path d="M' + cx + ',' + cy + ' L' + p0[0].toFixed(2) + ',' + p0[1].toFixed(2) + ' A' + RAD + ',' + RAD + ' 0 ' + (frac > 0.5 ? 1 : 0) + ' 1 ' + p1[0].toFixed(2) + ',' + p1[1].toFixed(2) + ' Z" fill="' + col + '" stroke="#fff" stroke-width="1.5"/>'; }
+      var pct = multi ? it.v + '명' : (it.v / total * 100).toFixed(1) + '%';
+      var cap = frac >= 0.25 ? 7 : frac >= 0.15 ? 6 : frac >= 0.1 ? 4 : 0, nm = wrap(it.n, cap || 8), inside = items.length === 1 || (cap > 0 && nm.length <= 2 && nm.every(function (l) { return l.length <= cap + 1; }));
+      if (inside) {
+        var tp = items.length === 1 ? [cx, cy] : pt(mid, RAD * 0.62), fg = lum(col) > 0.62 ? '#111' : '#fff', rowsT = nm.concat([pct]), y0 = tp[1] - (rowsT.length - 1) * 6.4 + 3.6;
+        rowsT.forEach(function (x, k) { labels += '<text x="' + tp[0].toFixed(1) + '" y="' + (y0 + k * 12.8).toFixed(1) + '" text-anchor="middle" font-size="' + (k < nm.length ? (cap <= 6 ? 10.5 : 11.5) : 10) + '"' + (k < nm.length ? ' font-weight="700"' : '') + ' fill="' + fg + '">' + esc(x) + '</text>'; });
+      } else { // 작은 조각·긴 이름: 바깥에 선으로 이어 적는다
+        var s0 = pt(mid, RAD), s1 = pt(mid, RAD + 9), ux = Math.cos(mid), uy = Math.sin(mid), anchor = ux > 0.25 ? 'start' : ux < -0.25 ? 'end' : 'middle';
+        var lx = s1[0] + (anchor === 'start' ? 3 : anchor === 'end' ? -3 : 0), rowsO = nm.length === 1 ? [nm[0] + ' ' + pct] : nm.concat([pct]), ly0 = s1[1] + (uy < -0.5 ? -3 - (rowsO.length - 1) * 12 : uy > 0.5 ? 10 : 4 - (rowsO.length - 1) * 6);
+        labels += '<line x1="' + s0[0].toFixed(1) + '" y1="' + s0[1].toFixed(1) + '" x2="' + s1[0].toFixed(1) + '" y2="' + s1[1].toFixed(1) + '" stroke="#777" stroke-width=".8"/>';
+        rowsO.forEach(function (x, k) { labels += '<text x="' + lx.toFixed(1) + '" y="' + (ly0 + k * 12).toFixed(1) + '" text-anchor="' + anchor + '" font-size="10.5" fill="#111"' + (k === rowsO.length - 1 ? '' : ' font-weight="600"') + '>' + esc(x) + '</text>'; });
       }
+      a0 = a1;
     });
-    return svg + '</svg>';
+    return svg + labels + '</svg>';
   }
 
   function rpFig(url, caption) { return '<div class="rp-fig"><img src="' + url + '" alt="' + esc(caption || '') + '">' + (caption ? '<div class="rp-cap">' + esc(caption) + '</div>' : '') + '</div>'; }
@@ -1131,65 +1143,63 @@
 
 
   function openReport(S) {
-    var c = D.config, today = new Date(), agg = courseAgg(S);
+    var c = D.config, today = new Date(), agg = courseAgg(S), IW = RP_W - 30; // 카드 안쪽 폭
     var ymd = today.getFullYear() + '. ' + (today.getMonth() + 1) + '. ' + today.getDate() + '.';
+    var img = function (cfg, h) { return '<img class="rp-img" src="' + chartImg(cfg, IW, h) + '" alt="">'; };
+    var cardH = function (title, sub) { return '<div class="card-h"><div><h4>' + esc(title) + '</h4>' + (sub ? '<div class="m">' + esc(sub) + '</div>' : '') + '</div></div>'; };
     var h = '<header class="rp-head"><div class="rp-kicker">' + esc([c.course, cohort].filter(Boolean).join(' ')) + ' 설문 결과 보고</div>' +
       '<h1>' + esc(c.title) + '</h1><div class="rp-meta">' + [c.period ? '연수 기간 ' + esc(c.period) : '', '응답자 ' + S.n + '명', '작성일 ' + ymd].filter(Boolean).join(' · ') + '</div></header>';
+    h += kpiHTML(S, agg); // 결과 화면 맨 위의 요약 타일과 같다
 
-    // 요약: 척도 묶음 평균 + 과목 평가 평균
-    var sum = [], sr = S.scaleRes.filter(function (R) { return R.items.length; });
-    sr.forEach(function (R, i) {
-      if (i === 0) sum.push([R.items[0].item, f2(R.items[0].mean), pct(R.items[0].top2)]);
-      sum.push([R.name + ' 평균 (' + R.items.length + '개 지표)', f2(R.all.mean), pct(R.all.top2)]);
-    });
-    agg.forEach(function (a) { sum.push(['과목 ' + a.k + ' 평균 (' + S.courses.length + '개 과목)', f2(a.s.mean), pct(a.s.top2)]); });
-    if (sum.length) h += '<section><h2>요약</h2>' + rpTable(['구분', '평균 (척도 만점 기준)', '위쪽 두 칸 비율'], sum, [1, 2]) + '</section>';
-
-    // 섹션 순서대로
+    // 섹션 순서대로 (결과 화면과 같은 순서·같은 카드)
     c.sections.forEach(function (sec) {
-      var parts = '', small = [];
-      var flush = function () { if (small.length) { parts += '<div class="rp-demo">' + small.join('') + '</div><div class="rp-cap">※ 원의 면적은 응답 수에 비례해요. 표에는 전체 응답이 있어요.</div>'; small = []; } };
+      var parts = '', pend = [], pendType = null;
+      var flush = function () { if (pend.length) { parts += pendType === 'choice' ? '<div class="minis">' + pend.join('') + '</div>' : pend.join(''); } pend = []; pendType = null; };
       sec.blocks.forEach(function (b) {
         var R = S.res[b.id];
         if (b.type === 'choice') {
           if (!R.base) return;
           if (R.mode === 'rank') {
             flush();
-            parts += '<h3>' + esc(b.label) + ' <span class="rp-cnt">' + esc(choiceSub(R)) + '</span></h3>' +
-              rpFig(chartImg(choiceChartCfg(R, true), RP_W, 40 + R.entries.length * 26)) +
+            parts += '<div class="card">' + cardH(b.label, choiceSub(R)) + img(choiceChartCfg(R, true), 40 + R.entries.length * 26) +
               rpTable(['순위', '항목'].concat(R.rows[0].r.map(function (_, i) { return (i + 1) + '순위'; })).concat(['점수']),
-                R.rows.map(function (x, i) { return [i + 1, x.opt].concat(x.r).concat([x.score]); }), R.rows[0].r.map(function (_, i) { return i + 2; }).concat([R.K + 2]));
+                R.rows.map(function (x, i) { return [i + 1, x.opt].concat(x.r).concat([x.score]); }), R.rows[0].r.map(function (_, i) { return i + 2; }).concat([R.K + 2])) + '</div>';
           } else {
-            small.push('<div class="rp-demo-i"><h4>' + esc(b.label) + (R.mode === 'multi' ? ' <span class="rp-cnt">(복수 선택)</span>' : '') + '</h4>' + vennSvg(R) +
-              rpTable(['구분', '명', R.mode === 'multi' ? '응답자 대비' : '비율'], R.entries.map(function (e) { return [e[0], e[1], rateOf(R, e[1])]; }), [1, 2]) + '</div>');
+            if (pendType !== 'choice') flush();
+            pendType = 'choice'; pend.push(choicePieCard(R)); // 원 그래프 + 표 (결과 화면과 같은 카드)
           }
           return;
         }
         flush();
         if (b.type === 'scale') {
           if (!R.items.length) return;
-          parts += (b.title ? '<h3>' + esc(b.title) + '</h3>' : '') +
-            rpFig(chartImg(scaleChartCfg(R, true), RP_W, 70 + R.items.length * 34), '지표별 응답 분포 (막대 길이 = 응답 비율, 괄호 = 평균)') +
-            rpTable(['지표', '평균', R.pos, '응답'].concat(zeros(R.N).map(function (_, i) { return (R.N - i) + '점'; })),
+          parts += '<div class="card">' + cardH(R.name + ' 지표별 응답 분포', '막대 길이 = 응답 비율, 괄호 = 평균 점수') + img(scaleChartCfg(R, true), 70 + R.items.length * 34) + '</div>' +
+            '<div class="minis">' + R.items.map(function (o) {
+              return '<div class="card">' + cardH(o.item, '평균 ' + f2(o.mean) + ' · ' + R.pos + ' ' + pct(o.top2) + ' · ' + o.n + '명') +
+                '<img class="rp-img" src="' + chartImg(scaleMiniCfg(R, o, true), Math.round(IW / 2) - 4, 150) + '" alt=""></div>';
+            }).join('') + '</div>' +
+            '<div class="card">' + cardH('지표별 수치') + rpTable(['지표', '평균', R.pos, '응답'].concat(zeros(R.N).map(function (_, i) { return (R.N - i) + '점'; })),
               R.items.map(function (o) { return [o.item, f2(o.mean), pct(o.top2), o.n].concat(o.counts.slice().reverse()); }),
-              zeros(3 + R.N).map(function (_, i) { return i + 1; }));
+              zeros(3 + R.N).map(function (_, i) { return i + 1; })) + '</div>';
         } else if (b.type === 'timetable') {
           if (!S.courses.length) return;
+          var both = courseChartConfig(S, { metric: 'both', sort: 'pos' }, true);
+          parts += '<div class="card">' + cardH('과목별 평균 점수 (시간표순)', '1~' + (S.cn || 5) + '점 척도 · 분반 과목은 해당 분반 수강자만 응답') +
+            legendHTML(S.itemKeys.map(function (k, i) { return [k, SERIES[i % SERIES.length]]; })) + img(both, both._height) + '</div>';
           S.itemKeys.forEach(function (k, i) {
             var cc = courseChartConfig(S, { metric: String(i), sort: 'desc' }, true);
-            parts += '<h3>' + esc(k) + ' 점수 순위</h3>' + rpFig(chartImg(cc, RP_W, cc._height), k + ' 평균 점수가 높은 순 (1~' + (S.cn || 5) + '점)');
+            parts += '<div class="card">' + cardH(k + ' 점수 순위', k + ' 평균 점수가 높은 순') + img(cc, cc._height) + '</div>';
           });
-          parts += '<h3>과목별 상세 (시간표순)</h3>' + rpTable(['일자', '시간', '과목', '강사', '응답'].concat([].concat.apply([], S.itemKeys.map(function (k) { return [k + ' 평균', k + ' 만족 비율']; }))),
+          parts += '<div class="card">' + cardH('과목별 상세', '시간표 순서') + rpTable(['일자', '시간', '과목', '강사', '응답'].concat([].concat.apply([], S.itemKeys.map(function (k) { return [k + ' 평균', k + ' 만족 비율']; }))),
             S.courses.slice().sort(function (a, z) { return a.pos - z.pos; }).map(function (x) {
               return [x.date, x.time, x.title + (x.split ? ' (분반)' : ''), x.inst, x.n].concat([].concat.apply([], S.itemKeys.map(function (k) { return [f2(x.by[k].mean), pct(x.by[k].top2)]; })));
-            }), [4, 5, 6, 7, 8]) + '<div class="rp-cap">평균 = 척도 만점 기준 평균 · 만족 비율 = 척도에서 위쪽 두 칸을 고른 사람의 비율</div>';
+            }), [4, 5, 6, 7, 8]) + '<div class="rp-cap">평균 = 척도 만점 기준 평균 · 만족 비율 = 척도에서 위쪽 두 칸을 고른 사람의 비율</div></div>';
         } else if (b.type === 'text') {
-          parts += '<h3>' + esc(R.q) + ' <span class="rp-cnt">' + R.answers.length + '건' + (R.skipped ? ' · "없음" 등 ' + R.skipped + '건 제외' : '') + '</span></h3>' +
-            (R.answers.length ? '<ol class="rp-open">' + R.answers.map(function (a) { return '<li>' + esc(a.text) + '</li>'; }).join('') + '</ol>' : '<p class="rp-cnt">응답 없음</p>');
+          parts += openCard(R); // 결과 화면의 의견 카드와 같다
         }
       });
       flush();
-      if (parts) h += '<section><h2>' + esc(sec.title) + '</h2>' + parts + '</section>';
+      if (parts) h += '<div class="sec">' + esc(sec.title) + '</div>' + parts;
     });
 
     showPreview('보고서 미리보기', h, (c.title || '설문 결과') + ' 결과 보고서', true);
