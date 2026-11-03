@@ -1092,7 +1092,8 @@
 
   /* 기본 정보용 원 그래프(파이): 12시 방향에서 시계 방향으로, 선택지 순서대로 조각을 나눈다.
    * 큰 조각은 안에 이름·비율을, 작은 조각은 밖에 선으로 이어 적는다. SVG라서 PDF로 저장해도 선명하다. */
-  var PIE_COL = ['#2a78d6', '#1f9d6b', '#e0a01e', '#d65a8a', '#7a5bd6', '#2fa8c2', '#d9702e', '#8a8f98'];
+  // 차분한 톤으로 채도·밝기를 맞춘 팔레트 (파랑 계열을 중심으로 청록·황토·테라코타·연보라가 어울리게)
+  var PIE_COL = ['#4a76b8', '#5fa39a', '#e2b25e', '#cf7f6b', '#8f87c2', '#86b6d6', '#a9b872', '#a3a9b3'];
   function pieSvg(R) {
     var W = 330, H = 212, cx = W / 2, cy = 108, RAD = 70, multi = R.mode === 'multi';
     var items = R.entries.filter(function (e) { return e[1] > 0; }).map(function (e) { return { n: String(e[0]), v: e[1] }; });
@@ -1120,7 +1121,7 @@
       var pct = multi ? it.v + '명' : (it.v / total * 100).toFixed(1) + '%';
       var cap = frac >= 0.25 ? 7 : frac >= 0.15 ? 6 : frac >= 0.1 ? 4 : 0, nm = wrap(it.n, cap || 8), inside = items.length === 1 || (cap > 0 && nm.length <= 2 && nm.every(function (l) { return l.length <= cap + 1; }));
       if (inside) {
-        var tp = items.length === 1 ? [cx, cy] : pt(mid, RAD * 0.62), fg = lum(col) > 0.62 ? '#111' : '#fff', rowsT = nm.concat([pct]), y0 = tp[1] - (rowsT.length - 1) * 6.4 + 3.6;
+        var tp = items.length === 1 ? [cx, cy] : pt(mid, RAD * 0.62), fg = lum(col) > 0.6 ? '#1b2330' : '#fff', rowsT = nm.concat([pct]), y0 = tp[1] - (rowsT.length - 1) * 6.4 + 3.6;
         rowsT.forEach(function (x, k) { labels += '<text x="' + tp[0].toFixed(1) + '" y="' + (y0 + k * 12.8).toFixed(1) + '" text-anchor="middle" font-size="' + (k < nm.length ? (cap <= 6 ? 10.5 : 11.5) : 10) + '"' + (k < nm.length ? ' font-weight="700"' : '') + ' fill="' + fg + '">' + esc(x) + '</text>'; });
       } else { // 작은 조각·긴 이름: 바깥에 선으로 이어 적는다
         var s0 = pt(mid, RAD), s1 = pt(mid, RAD + 9), ux = Math.cos(mid), uy = Math.sin(mid), anchor = ux > 0.25 ? 'start' : ux < -0.25 ? 'end' : 'middle';
