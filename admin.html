@@ -192,6 +192,19 @@
   .seg-b.on { background: var(--accent-soft); color: var(--accent-ink); font-weight: 700; }
 
   /* 보고서 미리보기 (A4 폭) */
+  /* 예약 마감 선택 창 */
+  .dlg-bg { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .dlg { background: var(--surface); border-radius: 12px; padding: 20px; width: 100%; max-width: 440px; box-shadow: 0 10px 40px rgba(0,0,0,.2); }
+  .dlg h3 { margin: 0 0 4px; font-size: 17px; }
+  .dlg .muted { margin-bottom: 14px; }
+  .dt-row { display: flex; align-items: flex-end; gap: 6px; }
+  .dt-row label { display: flex; flex-direction: column; font-size: 12px; color: var(--ink-2); gap: 2px; flex: 1 1 0; min-width: 0; }
+  .dt-row label.yr { flex-grow: 1.5; }
+  .dt-row select { width: 100%; padding: 8px 4px; border: 1px solid var(--axis); border-radius: 8px; background: var(--surface); font-size: 16px; }
+  .dt-sep { padding-bottom: 9px; font-weight: 700; }
+  .dt-quick { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
+  .dlg-act { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; flex-wrap: wrap; }
+  .dlg-act .left { margin-right: auto; }
   #report-wrap { position: fixed; inset: 0; z-index: 50; background: #e7e6e1; overflow: auto; }
   @media screen { html:has(body.reporting), body.reporting { overflow: hidden; } } /* 미리보기 중 뒤 화면 스크롤바 숨김(스크롤바 2개 방지) */
   .rp-bar { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--line); font-size: 13.5px; }
@@ -586,16 +599,69 @@
   function nowKst() { return new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 16).replace('T', ' '); }
   function scheduleClose(id) {
     var s = SURVEYS.filter(function (x) { return x.id === id; })[0]; if (!s) return;
-    var v = prompt('자동으로 마감할 날짜와 시각을 적어 주세요. (한국 시간)\n예: 2026-11-01 23:59\n\n비우고 확인을 누르면 예약이 해제돼요.', s.closeAt || '');
-    if (v === null) return;
-    v = v.trim();
-    if (v) {
-      var m = /^(\d{4})-(\d{1,2})-(\d{1,2})[ T]+(\d{1,2}):(\d{2})$/.exec(v);
-      if (!m) return toast('형식이 맞지 않아요. 예: 2026-11-01 23:59');
-      var p2 = function (x) { return ('0' + x).slice(-2); };
-      v = m[1] + '-' + p2(m[2]) + '-' + p2(m[3]) + ' ' + p2(m[4]) + ':' + m[5];
-      if (v <= nowKst()) return toast('지금보다 이후 시각으로 적어 주세요.');
+    pickCloseAt(s.closeAt || '', function (v) { saveCloseAt(s, id, v); });
+  }
+  // 예약 마감 시각 고르기: 연도 / 월 / 일 / 시 : 분 을 각각 드롭다운으로 (폰에서는 손가락으로 돌리는 선택 화면이 떠요)
+  function pickCloseAt(cur, done) {
+    var p2 = function (x) { return ('0' + x).slice(-2); };
+    var m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})$/.exec(cur);
+    var base = new Date(Date.now() + 9 * 3600e3); // 한국 시간 기준 날짜
+    if (!m) { base = new Date(base.getTime() + 864e5); }
+    var y0 = base.getUTCFullYear();
+    var init = m ? [+m[1], +m[2], +m[3], +m[4], +m[5]] : [y0, base.getUTCMonth() + 1, base.getUTCDate(), 18, 0];
+    var mins = []; for (var k = 0; k < 60; k += 5) mins.push(k); mins.push(59);
+    if (mins.indexOf(init[4]) < 0) { mins.push(init[4]); mins.sort(function (a, b) { return a - b; }); }
+    var opt = function (arr, sel, fmt) { return arr.map(function (x) { return '<option value="' + x + '"' + (x === sel ? ' selected' : '') + '>' + (fmt ? fmt(x) : x) + '</option>'; }).join(''); };
+    var range = function (a, b) { var r = []; for (var i = a; i <= b; i++) r.push(i); return r; };
+    var bg = document.createElement('div');
+    bg.className = 'dlg-bg';
+    bg.innerHTML = '<div class="dlg" role="dialog" aria-modal="true" aria-label="예약 마감">' +
+      '<h3>예약 마감</h3><div class="muted">정한 시각(한국 시간)이 되면 자동으로 마감돼요.</div>' +
+      '<div class="dt-row">' +
+      '<label class="yr">연도<select id="dt-y">' + opt(range(Math.min(y0, init[0]), y0 + 1), init[0]) + '</select></label>' +
+      '<label>월<select id="dt-mo">' + opt(range(1, 12), init[1]) + '</select></label>' +
+      '<label>일<select id="dt-d"></select></label>' +
+      '<label>시<select id="dt-h">' + opt(range(0, 23), init[3], p2) + '</select></label><span class="dt-sep">:</span>' +
+      '<label>분<select id="dt-mi">' + opt(mins, init[4], p2) + '</select></label></div>' +
+      '<div class="dt-quick"><button class="btn sm" data-q="today">오늘 18:00</button><button class="btn sm" data-q="tonight">오늘 23:59</button><button class="btn sm" data-q="tomorrow">내일 18:00</button><button class="btn sm" data-q="week">1주 뒤 18:00</button></div>' +
+      '<div class="dlg-act">' + (cur ? '<button class="btn danger left" id="dt-clear">예약 해제</button>' : '') +
+      '<button class="btn" id="dt-cancel">취소</button><button class="btn primary" id="dt-ok">저장</button></div></div>';
+    document.body.appendChild(bg);
+    var $ = function (i) { return document.getElementById(i); };
+    function fillDays(sel) {
+      var n = new Date(Date.UTC(+$('dt-y').value, +$('dt-mo').value, 0)).getUTCDate();
+      sel = Math.min(sel || +$('dt-d').value || 1, n);
+      $('dt-d').innerHTML = opt(range(1, n), sel);
     }
+    fillDays(init[2]);
+    $('dt-y').onchange = $('dt-mo').onchange = function () { fillDays(); };
+    function setTo(d, h, mi) {
+      var y = d.getUTCFullYear();
+      if (![].some.call($('dt-y').options, function (o) { return +o.value === y; })) $('dt-y').insertAdjacentHTML('beforeend', '<option value="' + y + '">' + y + '</option>');
+      $('dt-y').value = y; $('dt-mo').value = d.getUTCMonth() + 1; fillDays(d.getUTCDate()); $('dt-h').value = h; $('dt-mi').value = mi;
+    }
+    bg.querySelectorAll('[data-q]').forEach(function (b) {
+      b.onclick = function () {
+        var now = new Date(Date.now() + 9 * 3600e3), q = b.dataset.q;
+        if (q === 'today') setTo(now, 18, 0);
+        else if (q === 'tonight') setTo(now, 23, 59);
+        else if (q === 'tomorrow') setTo(new Date(now.getTime() + 864e5), 18, 0);
+        else setTo(new Date(now.getTime() + 7 * 864e5), 18, 0);
+      };
+    });
+    function close() { bg.remove(); document.removeEventListener('keydown', onKey); }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    document.addEventListener('keydown', onKey);
+    bg.onclick = function (e) { if (e.target === bg) close(); };
+    $('dt-cancel').onclick = close;
+    if ($('dt-clear')) $('dt-clear').onclick = function () { close(); done(''); };
+    $('dt-ok').onclick = function () {
+      var v = $('dt-y').value + '-' + p2($('dt-mo').value) + '-' + p2($('dt-d').value) + ' ' + p2($('dt-h').value) + ':' + p2($('dt-mi').value);
+      if (v <= nowKst()) return toast('지금보다 이후 시각으로 골라 주세요.');
+      close(); done(v);
+    };
+  }
+  function saveCloseAt(s, id, v) {
     api('setCloseAt', KEY, id, v).then(function () {
       s.closeAt = v; if (D && CUR === id) D.meta.closeAt = v;
       toast(v ? v + '에 자동으로 마감돼요.' : '예약 마감을 해제했어요.');
@@ -606,15 +672,11 @@
     });
   }
 
-  // 마감된 설문 삭제: 응답이 있으면 "삭제"라고 직접 쳐야 지워진다. 결과 시트는 서버가 드라이브 휴지통으로 옮긴다.
+  // 마감된 설문 삭제: 확인만 누르면 지워진다(응답이 있어도). 결과 시트는 서버가 드라이브 휴지통으로 옮긴다.
   function deleteSurveyUi(id, btn) {
     var s = SURVEYS.filter(function (x) { return x.id === id; })[0]; if (!s) return;
     var note = '\n\n목록에서 사라지고, 결과 시트는 드라이브 휴지통으로 옮겨져요.\n(휴지통에서 30일 안에는 복구할 수 있어요)';
-    if (s.count > 0) {
-      var a = prompt('「' + s.title + '」\n응답 ' + s.count + '개가 들어 있는 설문이에요.' + note + '\n\n정말 삭제하려면 "삭제"라고 입력하세요.');
-      if (a === null) return;
-      if (a.trim() !== '삭제') return toast('"삭제"라고 정확히 입력해야 지워져요. 삭제하지 않았어요.');
-    } else if (!confirm('「' + s.title + '」을(를) 삭제할까요?' + note)) return;
+    if (!confirm('「' + s.title + '」을(를) 삭제할까요?' + (s.count > 0 ? '\n응답 ' + s.count + '개가 들어 있는 설문이에요.' : '') + note)) return;
     btn.disabled = true;
     api('deleteSurvey', KEY, id).then(function () {
       SURVEYS = SURVEYS.filter(function (x) { return x.id !== id; }); delete RES[id];
