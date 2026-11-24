@@ -193,6 +193,7 @@
 
   /* 보고서 미리보기 (A4 폭) */
   #report-wrap { position: fixed; inset: 0; z-index: 50; background: #e7e6e1; overflow: auto; }
+  @media screen { html:has(body.reporting), body.reporting { overflow: hidden; } } /* 미리보기 중 뒤 화면 스크롤바 숨김(스크롤바 2개 방지) */
   .rp-bar { position: sticky; top: 0; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 10px 16px; background: var(--surface); border-bottom: 1px solid var(--line); font-size: 13.5px; }
   .rp-tip { color: var(--ink-2); margin-right: auto; }
   #report { width: 794px; max-width: calc(100% - 32px); margin: 20px auto 40px; padding: 52px 52px 60px; background: #fff; color: #111; font-size: 12.5px; line-height: 1.55; box-shadow: 0 2px 14px rgba(0,0,0,.12); }
