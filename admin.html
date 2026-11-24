@@ -1193,6 +1193,10 @@
       return ok;
     };
     var svg = '<svg class="rp-pie" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="' + esc(R.b.label) + ' 응답 비율 원 그래프" font-family="Pretendard Variable, Pretendard, Malgun Gothic, sans-serif">', labels = '', a0 = -Math.PI / 2;
+    // 끝쪽에 작은 조각(6% 미만)이 2개 이상 몰려 있으면 12시 위쪽에서 선이 엉키므로, 그 묶음이 3시 방향(오른쪽 가운데)에 오도록 돌려 놓는다
+    var trail = 0, nSmall = 0;
+    for (var ti = items.length - 1; ti >= 0 && items[ti].v / total < 0.06; ti--) { trail += items[ti].v / total; nSmall++; }
+    if (nSmall >= 2 && nSmall < items.length) a0 = trail * Math.PI;
     items.forEach(function (it, i) {
       var col = PIE_COL[i % PIE_COL.length], frac = it.v / total, a1 = a0 + frac * 2 * Math.PI, mid = (a0 + a1) / 2;
       if (items.length === 1) svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + RAD + '" fill="' + col + '" stroke="#fff" stroke-width="1.5"/>';
@@ -1213,7 +1217,7 @@
         rowsT.forEach(function (x, k) { labels += '<text x="' + tp[0].toFixed(1) + '" y="' + (y0 + k * 12.8).toFixed(1) + '" text-anchor="middle" font-size="' + (k < nm.length ? fsN : 10) + '"' + (k < nm.length ? ' font-weight="700"' : '') + ' fill="' + fg + '">' + esc(x) + '</text>'; });
       } else { // 작은 조각·긴 이름: 바깥에 선으로 이어 적는다 (위치는 다 모은 뒤 겹치지 않게 정한다)
         var s0 = pt(mid, RAD), s1 = pt(mid, RAD + 9), anchor = Math.cos(mid) >= 0 ? 'start' : 'end';
-        var one = it.n + ' ' + pct, room = cx - RAD - 14; // 원 옆 남는 폭
+        var one = it.n + ' ' + pct, room = cx - RAD - 22; // 원 옆 남는 폭
         var rowsO = textW(one, 10.5) <= room ? [one] : wrap(it.n, 6).concat([pct]);
         outs.push({ s0: s0, s1: s1, anchor: anchor, rows: rowsO, yc: s1[1], h: rowsO.length * 12 });
       }
@@ -1227,13 +1231,11 @@
       var over = g.length ? prev - (H - 2) : 0; // 아래로 넘치면 다 같이 올린다
       if (over > 0) g.forEach(function (o) { o.yc -= over; });
       g.forEach(function (o) {
-        // 글자 줄이 원과 겹치지 않도록 그 높이에서 원 바깥까지 띄운다
-        var dy = Math.max(Math.abs(o.yc - o.h / 2 - cy), 0), dy2 = Math.max(Math.abs(o.yc + o.h / 2 - cy), 0), near = Math.min(dy, dy2);
-        if ((o.yc - o.h / 2 - cy) * (o.yc + o.h / 2 - cy) < 0) near = 0;
-        var off = near < RAD + 8 ? Math.sqrt((RAD + 8) * (RAD + 8) - near * near) + 4 : 4;
-        var lx = side === 'start' ? Math.max(o.s1[0] + 4, cx + off) : Math.min(o.s1[0] - 4, cx - off);
-        var ex = side === 'start' ? lx - 2 : lx + 2, ey = o.yc;
-        labels += '<polyline points="' + o.s0[0].toFixed(1) + ',' + o.s0[1].toFixed(1) + ' ' + o.s1[0].toFixed(1) + ',' + o.s1[1].toFixed(1) + ' ' + ex.toFixed(1) + ',' + ey.toFixed(1) + '" fill="none" stroke="#777" stroke-width=".8"/>';
+        // 바깥 글자는 원 양옆의 세로 줄 한 곳에 위에서부터 차례로 놓고, 조각 → 꺾는 점 → 글자로 선을 잇는다 (선끼리 엇갈리지 않음)
+        var lx = side === 'start' ? cx + RAD + 18 : cx - RAD - 18;
+        var ex = side === 'start' ? lx - 3 : lx + 3, ey = o.yc;
+        var kx = side === 'start' ? Math.max(o.s1[0], ex - 10) : Math.min(o.s1[0], ex + 10);
+        labels += '<polyline points="' + o.s0[0].toFixed(1) + ',' + o.s0[1].toFixed(1) + ' ' + o.s1[0].toFixed(1) + ',' + o.s1[1].toFixed(1) + ' ' + kx.toFixed(1) + ',' + ey.toFixed(1) + ' ' + ex.toFixed(1) + ',' + ey.toFixed(1) + '" fill="none" stroke="#777" stroke-width=".8"/>';
         var y0 = o.yc - o.h / 2 + 9.5;
         o.rows.forEach(function (x, k) { labels += '<text x="' + lx.toFixed(1) + '" y="' + (y0 + k * 12).toFixed(1) + '" text-anchor="' + side + '" font-size="10.5" fill="#111"' + (k === o.rows.length - 1 ? '' : ' font-weight="600"') + '>' + esc(x) + '</text>'; });
       });
