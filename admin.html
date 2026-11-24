@@ -227,7 +227,8 @@
   .rp-tbl tr { break-inside: avoid; page-break-inside: avoid; }
   .rp-keep { break-inside: avoid; page-break-inside: avoid; }
   /* 보고서도 결과 화면과 같은 카드·타일·섹션 제목 모양을 쓴다 (A4 폭에 맞게 열 수만 조정) */
-  #report .kpis { grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0 6px; }
+  #report .kpis { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 14px 0 6px; } /* 4개까지는 한 줄 */
+  #report .kpi .s { font-size: 10.5px; letter-spacing: -0.2px; }
   #report .kpi { padding: 10px 12px; } #report .kpi .v { font-size: 24px; }
   #report .sec { font-size: 16px; margin: 24px 0 10px; padding-bottom: 5px; border-bottom: 1.5px solid #333; break-after: avoid; page-break-after: avoid; }
   #report .minis { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 12px; }
@@ -1158,7 +1159,7 @@
   // 차분한 톤으로 채도·밝기를 맞춘 팔레트 (파랑 계열을 중심으로 청록·황토·테라코타·연보라가 어울리게)
   var PIE_COL = ['#4a76b8', '#5fa39a', '#e2b25e', '#cf7f6b', '#8f87c2', '#86b6d6', '#a9b872', '#a3a9b3'];
   function pieSvg(R) {
-    var W = 330, H = 212, cx = W / 2, cy = 108, RAD = 70, multi = R.mode === 'multi';
+    var W = 360, H = 212, cx = W / 2, cy = 108, RAD = 70, multi = R.mode === 'multi';
     var items = R.entries.filter(function (e) { return e[1] > 0; }).map(function (e) { return { n: String(e[0]), v: e[1] }; });
     if (!items.length) return '';
     if (items.length > 8) { // 선택지가 많으면 작은 것을 "그 외"로 묶는다. (복수 선택은 사람이 겹쳐 세어지므로 묶지 않고 상위 8개만)
@@ -1176,23 +1177,66 @@
     };
     var lum = function (hex) { var n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; };
     var pt = function (ang, r) { return [cx + r * Math.cos(ang), cy + r * Math.sin(ang)]; };
+    var outs = [];
+    // 글자 폭 어림: 한글은 글자 크기만큼, 숫자·영문은 0.6배, 기호·띄어쓰기는 0.35배
+    var textW = function (t, fs) { var w = 0; for (var i = 0; i < t.length; i++) { var c = t.charCodeAt(i); w += c >= 0x1100 ? fs : /[\s·.,:()%\-~/]/.test(t[i]) ? fs * 0.35 : fs * 0.6; } return w; };
+    var fitsIn = function (nm, pct, fs, c, a0, a1) {
+      var rows = nm.map(function (t) { return [t, fs]; }).concat([[pct, 10]]), hh = rows.length * 12.8, top = c[1] - hh / 2, ok = true;
+      rows.forEach(function (r, k) {
+        var w = textW(r[0], r[1]) + 2, yT = top + k * 12.8, yB = yT + 12.8;
+        [[c[0] - w / 2, yT], [c[0] + w / 2, yT], [c[0] - w / 2, yB], [c[0] + w / 2, yB]].forEach(function (q) {
+          var dx = q[0] - cx, dy = q[1] - cy, d = Math.sqrt(dx * dx + dy * dy);
+          if (d > RAD - 2) ok = false;
+          else if (d > 6) { var a = Math.atan2(dy, dx); while (a < a0) a += 2 * Math.PI; while (a > a0 + 2 * Math.PI) a -= 2 * Math.PI; if (a > a1 - 0.02 || a < a0 + 0.02) ok = false; }
+        });
+      });
+      return ok;
+    };
     var svg = '<svg class="rp-pie" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="' + esc(R.b.label) + ' 응답 비율 원 그래프" font-family="Pretendard Variable, Pretendard, Malgun Gothic, sans-serif">', labels = '', a0 = -Math.PI / 2;
     items.forEach(function (it, i) {
       var col = PIE_COL[i % PIE_COL.length], frac = it.v / total, a1 = a0 + frac * 2 * Math.PI, mid = (a0 + a1) / 2;
       if (items.length === 1) svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + RAD + '" fill="' + col + '" stroke="#fff" stroke-width="1.5"/>';
       else { var p0 = pt(a0, RAD), p1 = pt(a1, RAD); svg += '<path d="M' + cx + ',' + cy + ' L' + p0[0].toFixed(2) + ',' + p0[1].toFixed(2) + ' A' + RAD + ',' + RAD + ' 0 ' + (frac > 0.5 ? 1 : 0) + ' 1 ' + p1[0].toFixed(2) + ',' + p1[1].toFixed(2) + ' Z" fill="' + col + '" stroke="#fff" stroke-width="1.5"/>'; }
       var pct = multi ? it.v + '명' : (it.v / total * 100).toFixed(1) + '%';
-      var cap = frac >= 0.25 ? 7 : frac >= 0.15 ? 6 : frac >= 0.1 ? 4 : 0, nm = wrap(it.n, cap || 8), inside = items.length === 1 || (cap > 0 && nm.length <= 2 && nm.every(function (l) { return l.length <= cap + 1; }));
+      var cap = frac >= 0.25 ? 7 : frac >= 0.15 ? 6 : frac >= 0.1 ? 4 : 0, nm = wrap(it.n, cap || 8);
+      // 조각 안에 글자가 다 들어가는지 실제 크기로 따져 본다. 조금이라도 벗어나면 바깥에 선을 그어 적는다.
+      var fsN = cap <= 6 ? 10.5 : 11.5, inside = false, tp = null;
+      if (items.length === 1) { inside = true; tp = [cx, cy]; }
+      else if (cap > 0 && nm.length <= 2) {
+        [nm, wrap(it.n, 4), wrap(it.n, 3)].some(function (cand) {
+          if (cand.length > 2) return false;
+          return [0.62, 0.56, 0.68, 0.5].some(function (rr) { var c = pt(mid, RAD * rr); if (fitsIn(cand, pct, fsN, c, a0, a1)) { inside = true; tp = c; nm = cand; return true; } });
+        });
+      }
       if (inside) {
-        var tp = items.length === 1 ? [cx, cy] : pt(mid, RAD * 0.62), fg = lum(col) > 0.6 ? '#1b2330' : '#fff', rowsT = nm.concat([pct]), y0 = tp[1] - (rowsT.length - 1) * 6.4 + 3.6;
-        rowsT.forEach(function (x, k) { labels += '<text x="' + tp[0].toFixed(1) + '" y="' + (y0 + k * 12.8).toFixed(1) + '" text-anchor="middle" font-size="' + (k < nm.length ? (cap <= 6 ? 10.5 : 11.5) : 10) + '"' + (k < nm.length ? ' font-weight="700"' : '') + ' fill="' + fg + '">' + esc(x) + '</text>'; });
-      } else { // 작은 조각·긴 이름: 바깥에 선으로 이어 적는다
-        var s0 = pt(mid, RAD), s1 = pt(mid, RAD + 9), ux = Math.cos(mid), uy = Math.sin(mid), anchor = ux > 0.25 ? 'start' : ux < -0.25 ? 'end' : 'middle';
-        var lx = s1[0] + (anchor === 'start' ? 3 : anchor === 'end' ? -3 : 0), rowsO = nm.length === 1 ? [nm[0] + ' ' + pct] : nm.concat([pct]), ly0 = s1[1] + (uy < -0.5 ? -3 - (rowsO.length - 1) * 12 : uy > 0.5 ? 10 : 4 - (rowsO.length - 1) * 6);
-        labels += '<line x1="' + s0[0].toFixed(1) + '" y1="' + s0[1].toFixed(1) + '" x2="' + s1[0].toFixed(1) + '" y2="' + s1[1].toFixed(1) + '" stroke="#777" stroke-width=".8"/>';
-        rowsO.forEach(function (x, k) { labels += '<text x="' + lx.toFixed(1) + '" y="' + (ly0 + k * 12).toFixed(1) + '" text-anchor="' + anchor + '" font-size="10.5" fill="#111"' + (k === rowsO.length - 1 ? '' : ' font-weight="600"') + '>' + esc(x) + '</text>'; });
+        var fg = lum(col) > 0.6 ? '#1b2330' : '#fff', rowsT = nm.concat([pct]), y0 = tp[1] - (rowsT.length - 1) * 6.4 + 3.6;
+        rowsT.forEach(function (x, k) { labels += '<text x="' + tp[0].toFixed(1) + '" y="' + (y0 + k * 12.8).toFixed(1) + '" text-anchor="middle" font-size="' + (k < nm.length ? fsN : 10) + '"' + (k < nm.length ? ' font-weight="700"' : '') + ' fill="' + fg + '">' + esc(x) + '</text>'; });
+      } else { // 작은 조각·긴 이름: 바깥에 선으로 이어 적는다 (위치는 다 모은 뒤 겹치지 않게 정한다)
+        var s0 = pt(mid, RAD), s1 = pt(mid, RAD + 9), anchor = Math.cos(mid) >= 0 ? 'start' : 'end';
+        var one = it.n + ' ' + pct, room = cx - RAD - 14; // 원 옆 남는 폭
+        var rowsO = textW(one, 10.5) <= room ? [one] : wrap(it.n, 6).concat([pct]);
+        outs.push({ s0: s0, s1: s1, anchor: anchor, rows: rowsO, yc: s1[1], h: rowsO.length * 12 });
       }
       a0 = a1;
+    });
+    // 바깥 글자: 왼쪽·오른쪽 무리마다 위에서부터 차례로 놓아 서로 겹치지 않게 한다
+    ['start', 'end'].forEach(function (side) {
+      var g = outs.filter(function (o) { return o.anchor === side; }).sort(function (p, q) { return p.yc - q.yc; });
+      var prev = -1e9;
+      g.forEach(function (o) { var top = Math.max(o.yc - o.h / 2, prev + 2, 4); o.yc = top + o.h / 2; prev = top + o.h; });
+      var over = g.length ? prev - (H - 2) : 0; // 아래로 넘치면 다 같이 올린다
+      if (over > 0) g.forEach(function (o) { o.yc -= over; });
+      g.forEach(function (o) {
+        // 글자 줄이 원과 겹치지 않도록 그 높이에서 원 바깥까지 띄운다
+        var dy = Math.max(Math.abs(o.yc - o.h / 2 - cy), 0), dy2 = Math.max(Math.abs(o.yc + o.h / 2 - cy), 0), near = Math.min(dy, dy2);
+        if ((o.yc - o.h / 2 - cy) * (o.yc + o.h / 2 - cy) < 0) near = 0;
+        var off = near < RAD + 8 ? Math.sqrt((RAD + 8) * (RAD + 8) - near * near) + 4 : 4;
+        var lx = side === 'start' ? Math.max(o.s1[0] + 4, cx + off) : Math.min(o.s1[0] - 4, cx - off);
+        var ex = side === 'start' ? lx - 2 : lx + 2, ey = o.yc;
+        labels += '<polyline points="' + o.s0[0].toFixed(1) + ',' + o.s0[1].toFixed(1) + ' ' + o.s1[0].toFixed(1) + ',' + o.s1[1].toFixed(1) + ' ' + ex.toFixed(1) + ',' + ey.toFixed(1) + '" fill="none" stroke="#777" stroke-width=".8"/>';
+        var y0 = o.yc - o.h / 2 + 9.5;
+        o.rows.forEach(function (x, k) { labels += '<text x="' + lx.toFixed(1) + '" y="' + (y0 + k * 12).toFixed(1) + '" text-anchor="' + side + '" font-size="10.5" fill="#111"' + (k === o.rows.length - 1 ? '' : ' font-weight="600"') + '>' + esc(x) + '</text>'; });
+      });
     });
     return svg + labels + '</svg>';
   }
