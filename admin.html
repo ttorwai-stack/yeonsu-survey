@@ -1706,7 +1706,14 @@
   KEY = ss('svy-admin') || '';
   // 한동안 안 쓰면 구글 서버가 잠들어 첫 요청이 20초 넘게 걸린다 → 비밀번호 치는 동안 미리 깨워 둔다
   if (MODE === 'http') api('listOpenSurveys').catch(function () { /* 깨우기용 */ });
-  if (KEY) loadList();
+  // 율곡피버 도구함에서 열면 ?yp=통행증 → 비밀번호 없이 들어감 (주소창에서는 바로 지움)
+  var YP = new URLSearchParams(location.search).get('yp');
+  if (YP && MODE === 'http') {
+    try { var u = new URL(location.href); u.searchParams.delete('yp'); history.replaceState(null, '', u.pathname + u.search + u.hash); } catch (e) { /* 무시 */ }
+    loading('율곡피버 등급 확인 중');
+    api('passLogin', YP).then(function (k) { KEY = k; loadList(); })
+      .catch(function (e) { loading(null); if (KEY) loadList(); else showLogin('율곡피버 확인 실패: ' + errMsg(e)); });
+  } else if (KEY) loadList();
   else showLogin();
 })();
 </script>

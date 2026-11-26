@@ -183,7 +183,7 @@ function getAppUrl() {
  */
 var API_ACTIONS = {
   listOpenSurveys: listOpenSurveys, getSurvey: getSurvey, submitResponse: submitResponse,
-  verifyKey: verifyKey, listSurveys: listSurveys, createSurvey: createSurvey,
+  verifyKey: verifyKey, passLogin: passLogin, listSurveys: listSurveys, createSurvey: createSurvey,
   setSurveyStatus: setSurveyStatus, getResults: getResults, saveConfig: saveConfig, setCloseAt: setCloseAt, deleteSurvey: deleteSurvey
 };
 
@@ -635,7 +635,29 @@ function readConfig_(sheetId) {
 function checkKey_(key) {
   var props = PropertiesService.getScriptProperties();
   var real = props.getProperty('ADMIN_KEY');
-  return installed_() && !!real && String(key || '') === real;
+  key = String(key || '');
+  if (/^ys_[0-9a-f]{64}$/.test(key)) return installed_() && !!CacheService.getScriptCache().get('svy-sess-' + key);  // 율곡피버 통행증으로 받은 열쇠
+  return installed_() && !!real && key === real;
+}
+
+/* ───────── 율곡피버 통행증 ─────────
+ * 율곡피버 도구함에서 열면 ?yp=통행증 이 붙어 온다. 율곡피버 데이터 서버에 확인해
+ * 관리자·편집 등급이면 비밀번호 없이 6시간짜리 관리 열쇠(ys_…)를 준다. */
+var YULGOK_PASS_URL = 'https://script.google.com/macros/s/AKfycbzQDRGtWNYkox_yIWs0bvAOpP6QzVYiySbfEe7phqas-_1In6WU3Y_x7sqgOo7KWkQj/exec';
+function yulgokPass_(yp) {
+  yp = String(yp || '');
+  if (!/^yp_[0-9a-f]{40}$/.test(yp)) throw new Error('통행증 형식이 아니에요.');
+  var r = UrlFetchApp.fetch(YULGOK_PASS_URL, { method: 'post', contentType: 'text/plain', payload: JSON.stringify({ fn: 'passCheck', pass: yp }), muteHttpExceptions: true, followRedirects: true });
+  var o; try { o = JSON.parse(r.getContentText()); } catch (e) { throw new Error('율곡피버 확인 실패'); }
+  if (!o.ok) throw new Error(o.err || '통행증이 맞지 않아요.');
+  return o.data;
+}
+function passLogin(yp) {
+  var who = yulgokPass_(yp);
+  if (who.role !== '관리자' && who.role !== '편집') throw new Error('율곡피버 등급으로는 설문 관리에 들어올 수 없어요.');
+  var sess = 'ys_' + Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+  CacheService.getScriptCache().put('svy-sess-' + sess, who.email, 21600);
+  return sess;
 }
 
 function requireKey_(key) {
